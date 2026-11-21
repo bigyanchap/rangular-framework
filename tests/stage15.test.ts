@@ -645,10 +645,10 @@ test('preview behaviour: colour swatches, editor blocks, lightbox close and crum
   findAll(editor, (e) => hasClass(e, 'editor-chip') && e.textContent === 'Body')[0].click();
   assert.ok(editor.textContent.includes('Notes: Morning pages'), 'the Body chip dropped the title prefix');
   findAll(editor, (e) => hasClass(e, 'ed-done'))[0].click();
-  findAll(editor, (e) => hasClass(e, 'ed-add'))[0].click();
-  const area3 = findAll(editor, (e) => hasClass(e, 'ed-input'))[0] as unknown as { value: string };
-  assert.ok(area3, 'the add row opens the note for editing');
-  assert.equal(area3.value.split('\n').length, 4, 'the add row appended a fresh block');
+  assert.equal(
+    findAll(editor, (e) => hasClass(e, 'ed-add')).length, 0,
+    'there is no add row: a new block is a new line in the field',
+  );
 
   const light = previewOf(
     '<screen><lightbox [open]="open" (close)="shut()" src="a.jpg"><p>Cap</p></lightbox><p *ngIf="!open">Closed</p></screen>',

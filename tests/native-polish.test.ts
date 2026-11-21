@@ -283,9 +283,9 @@ test('the editor is a framed block editor with its controls inside (0.6.0)', () 
   assert.ok(editorFn.includes('parseBlocks') && editorFn.includes('serializeBlocks'), 'the value stays one string through the model');
   assert.ok(editorFn.includes('toggleInline'), 'the mark buttons toggle through the model');
   assert.ok(editorFn.includes('toggleBlockDone'), 'the checklist ring ticks through the model');
-  assert.ok(editorFn.includes('Tap to add a block'), 'the add row lives inside the frame');
+  assert.ok(!editorFn.includes('Tap to add a block'), 'there is no add row: a new block is a new line in the field (0.6.1, his call)');
   assert.ok(editorFn.includes('clearTimer'), 'a blur settles the note only after a beat, so a tool tap never settles it first');
-  assert.ok(editorFn.includes('enterEdit(next.length - 1, nextText)'), 'the add row opens the block from the text it just wrote, never from the stale list');
+  assert.ok(editorFn.includes('const offs = blockOffsets(list)'), 'enterEdit places the caret from the current value offsets');
   assert.ok(editorFn.includes('toggleInlineInValue'), 'the mark buttons toggle in whole-note coordinates');
   assert.ok(editorFn.includes('fieldLines * 22'), 'the whole-note field stands at least as tall as its lines, wrapped lines counted, so no line hides inside it');
   assert.ok(primitivesSrc.includes("editorChipsRow: { flexDirection: 'row', flexWrap: 'wrap'"), 'the chips row wraps when the frame is narrow (his pick A)');
@@ -301,6 +301,7 @@ test('the editor is a framed block editor with its controls inside (0.6.0)', () 
   assert.ok(previewSrc.includes("font-family: 'Times New Roman', Times, serif"), 'the preview Italic tool wears Times too');
   assert.ok(previewSrc.includes('function __edParse'), 'the preview carries the block model mirror');
   assert.ok(previewSrc.includes('function __edToggleInValue'), 'the preview toggles marks in whole-note coordinates too');
+  assert.ok(!previewSrc.includes('Tap to add a block'), 'the preview has no add row either');
   assert.ok(previewSrc.includes('.editor-chips { display: flex; flex-wrap: wrap;'), 'the preview chips row wraps too');
   assert.ok(previewSrc.includes('.editor-tools { display: flex; flex-wrap: wrap;'), 'the preview tools row wraps too');
   assert.ok(!previewSrc.includes('editor-area'), 'the old preview textarea editor is gone');
