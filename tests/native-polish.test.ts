@@ -271,7 +271,7 @@ test('the colour picker builds any colour: swatches, a saturation square and a h
   assert.ok(!previewSrc.includes('swatch-wheel'), 'the preview wheel is gone too');
 });
 
-test('the editor is a framed block editor with its controls inside (0.5.0)', () => {
+test('the editor is a framed block editor with its controls inside (0.6.0)', () => {
   assert.ok(primitivesSrc.includes("from './blocks'"), 'the editor reads the pure block model');
   assert.ok(primitivesSrc.includes('CHECKLIST_COLOR'), 'the checklist amber comes from the palette');
   const editorFn = primitivesSrc.slice(
@@ -284,8 +284,12 @@ test('the editor is a framed block editor with its controls inside (0.5.0)', () 
   assert.ok(editorFn.includes('toggleInline'), 'the mark buttons toggle through the model');
   assert.ok(editorFn.includes('toggleBlockDone'), 'the checklist ring ticks through the model');
   assert.ok(editorFn.includes('Tap to add a block'), 'the add row lives inside the frame');
-  assert.ok(editorFn.includes('clearTimer'), 'a blur closes the block only after a beat, so a tool tap never closes it first');
-  assert.ok(editorFn.includes('from?: Block[]') && editorFn.includes('if (!target) return'), 'openBlock reads the list it is given and refuses a missing block, so the add row can open the block it just created');
+  assert.ok(editorFn.includes('clearTimer'), 'a blur settles the note only after a beat, so a tool tap never settles it first');
+  assert.ok(editorFn.includes('enterEdit(next.length - 1, nextText)'), 'the add row opens the block from the text it just wrote, never from the stale list');
+  assert.ok(editorFn.includes('toggleInlineInValue'), 'the mark buttons toggle in whole-note coordinates');
+  assert.ok(editorFn.includes('fieldLines * 22'), 'the whole-note field stands at least as tall as its lines, wrapped lines counted, so no line hides inside it');
+  assert.ok(primitivesSrc.includes("editorChipsRow: { flexDirection: 'row', flexWrap: 'wrap'"), 'the chips row wraps when the frame is narrow (his pick A)');
+  assert.ok(primitivesSrc.includes("editorToolsRow: { flexDirection: 'row', flexWrap: 'wrap'"), 'the tools row wraps too');
   assert.ok(!editorFn.includes("tool('Bold'"), 'the old marks toolbar is gone');
   assert.ok(
     primitivesSrc.includes("fontFamily: Platform.OS === 'ios' ? 'Times New Roman' : 'serif'"),
@@ -296,5 +300,8 @@ test('the editor is a framed block editor with its controls inside (0.5.0)', () 
   assert.ok(previewSrc.includes('.editor-frame') && previewSrc.includes('.ed-ring'), 'the preview mirrors the frame and the rings');
   assert.ok(previewSrc.includes("font-family: 'Times New Roman', Times, serif"), 'the preview Italic tool wears Times too');
   assert.ok(previewSrc.includes('function __edParse'), 'the preview carries the block model mirror');
+  assert.ok(previewSrc.includes('function __edToggleInValue'), 'the preview toggles marks in whole-note coordinates too');
+  assert.ok(previewSrc.includes('.editor-chips { display: flex; flex-wrap: wrap;'), 'the preview chips row wraps too');
+  assert.ok(previewSrc.includes('.editor-tools { display: flex; flex-wrap: wrap;'), 'the preview tools row wraps too');
   assert.ok(!previewSrc.includes('editor-area'), 'the old preview textarea editor is gone');
 });

@@ -13,6 +13,10 @@ import {
   inlineActive,
   parseInline,
   markedSpans,
+  blockOffsets,
+  lineAtOffset,
+  toggleInlineInValue,
+  inlineActiveInValue,
 } from '../packages/ui/src/blocks';
 
 const SEED =
@@ -144,4 +148,69 @@ test('inline: parseInline splits runs and keeps their styles apart', () => {
   assert.deepEqual(parseInline('a * lone star'), [
     { text: 'a * lone star', bold: false, italic: false, underline: false, strike: false },
   ]);
+});
+
+test('offsets: blockOffsets measures each serialized line and its prefix', () => {
+  const blocks = parseBlocks(SEED);
+  const offs = blockOffsets(blocks);
+  assert.equal(offs.length, 6);
+  assert.deepEqual(offs[0], { start: 0, prefix: 2 });
+  assert.deepEqual(offs[1], { start: 16, prefix: 0 });
+  assert.equal(offs[2].prefix, 6);
+  assert.equal(offs[5].prefix, 3);
+  const value = serializeBlocks(blocks);
+  offs.forEach((o, i) => {
+    assert.equal(value.slice(o.start + o.prefix, o.start + o.prefix + blocks[i].text.length), blocks[i].text);
+  });
+});
+
+test('offsets: lineAtOffset finds the line holding an offset', () => {
+  const blocks = parseBlocks(SEED);
+  assert.equal(lineAtOffset(blocks, 0), 0);
+  assert.equal(lineAtOffset(blocks, 15), 0);
+  assert.equal(lineAtOffset(blocks, 16), 1);
+  assert.equal(lineAtOffset(blocks, 9999), 5);
+});
+
+test('value toggle: a selection inside one line unwraps and wraps again', () => {
+  const blocks = parseBlocks(SEED);
+  const offs = blockOffsets(blocks);
+  const start = offs[1].start + 10;
+  const end = offs[1].start + 17;
+  const out = toggleInlineInValue(blocks, start, end, '**');
+  assert.equal(serializeBlocks(out.blocks).split('\n')[1], 'Saw the sunrise again, and the air was *clear* and ++quiet++.');
+  assert.equal(out.start, start - 2);
+  assert.equal(out.end, end - 2);
+  const back = toggleInlineInValue(out.blocks, out.start, out.end, '**');
+  assert.equal(serializeBlocks(back.blocks), SEED);
+});
+
+test('value toggle: a caret inside a marked run unwraps that run', () => {
+  const blocks = parseBlocks(SEED);
+  const offs = blockOffsets(blocks);
+  const caret = offs[1].start + 13;
+  const out = toggleInlineInValue(blocks, caret, caret, '**');
+  assert.equal(serializeBlocks(out.blocks).split('\n')[1].includes('**sunrise**'), false);
+});
+
+test('value toggle: a selection across lines toggles each line part', () => {
+  const blocks = parseBlocks('one **two**\nthree **four**');
+  const value = serializeBlocks(blocks);
+  const out = toggleInlineInValue(blocks, 4, value.length, '**');
+  assert.equal(serializeBlocks(out.blocks), 'one two\nthree four');
+});
+
+test('value toggle: inlineActiveInValue reads the caret line', () => {
+  const blocks = parseBlocks(SEED);
+  const offs = blockOffsets(blocks);
+  assert.equal(inlineActiveInValue(blocks, offs[1].start + 10, offs[1].start + 17, '**'), true);
+  assert.equal(inlineActiveInValue(blocks, offs[1].start + 10, offs[1].start + 17, '*'), false);
+  assert.equal(inlineActiveInValue(blocks, 2, 5, '**'), false);
+});
+
+test('value toggle: full plain lines under a full selection wrap whole', () => {
+  const blocks = parseBlocks('plain line\nother');
+  const value = serializeBlocks(blocks);
+  const out = toggleInlineInValue(blocks, 0, value.length, '**');
+  assert.equal(serializeBlocks(out.blocks), '**plain line**\n**other**');
 });
