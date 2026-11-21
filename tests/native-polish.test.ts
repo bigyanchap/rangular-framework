@@ -263,6 +263,8 @@ test('the colour picker builds any colour: swatches, a saturation square and a h
     primitivesSrc.indexOf('export function RgColorPicker'),
     primitivesSrc.indexOf('export function RgCrumb'));
   assert.ok(pickerFn.includes('PanResponder'), 'the square and the bar are dragged, not just tapped');
+  assert.ok(pickerFn.includes('nativeEvent.locationY'), 'the drags read the finger in local coordinates (0.6.2)');
+  assert.ok(!pickerFn.includes('measureInWindow?.('), 'the picker never trusts a window measure taken while the sheet slides in (0.6.2)');
   assert.ok(pickerFn.includes('hexToHsv') && pickerFn.includes('hsvToHex'), 'the picker drafts in hsv and commits a hex');
   assert.ok(!primitivesSrc.includes('swatchWheel'), 'the colour wheel is gone');
   const previewSrc = fs.readFileSync(
