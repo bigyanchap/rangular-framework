@@ -1053,7 +1053,7 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
         (labelText ? `<span class="field-label">${escapeHtml(labelText)}</span>` : '') +
         `<div class="editor-frame"><div class="editor-head"><div class="editor-chips">${chipsHtml}</div>` +
         `<div class="editor-tools">${toolsHtml}</div></div>` +
-        `<div class="editor-blocks">${blocksHtml}<div class="ed-add">+ Tap to add a block</div></div></div>` +
+        `<div class="editor-blocks">${blocksHtml}</div></div>` +
         `</div>`;
     }
     if (el.tag === 'lightbox') {
@@ -1739,7 +1739,6 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
   .ed-moverow { display: inline-flex; gap: 2px; }
   .ed-moverow button { width: 28px; height: 22px; border: none; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 12px; font-family: inherit; }
   .ed-done { padding: 6px ${t.spacing.md}px; border: none; border-radius: ${t.radius.sm}px; background: var(--text); color: var(--role-surface); font-weight: 700; font-size: ${t.typography.label.fontSize}px; cursor: pointer; font-family: inherit; }
-  .ed-add { padding: ${t.spacing.sm}px ${t.spacing.xs}px; color: var(--text-muted); font-size: ${t.typography.body.fontSize}px; cursor: pointer; }
   .rg-image { display: block; border-radius: ${t.radius.md}px; }
   .overlay-backdrop.dark { background: rgba(0,0,0,.92); }
   .lightbox-image { max-width: 100%; max-height: 80%; object-fit: contain; position: relative; z-index: 1; }
@@ -5183,19 +5182,6 @@ function __buildEditor(el, scope, form, path) {
       row.appendChild(txt);
       body.appendChild(row);
     });
-    if (!disabled) {
-      var add = document.createElement('div');
-      add.className = 'ed-add';
-      add.textContent = '+ Tap to add a block';
-      add.addEventListener('click', function () {
-        var next = blocks.concat([{ kind: 'body', text: '', done: false }]);
-        var offs = __edOffsets(next);
-        var last = next.length - 1;
-        st.editing = true;
-        commit(next, { start: offs[last].start + offs[last].prefix, end: offs[last].start + offs[last].prefix });
-      });
-      body.appendChild(add);
-    }
   }
   frame.appendChild(body);
   wrap.appendChild(frame);
