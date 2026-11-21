@@ -14,7 +14,7 @@ import { renderPreview } from '../packages/compiler/src/preview/renderPreview';
 import { buildStyleSnapshot } from '../packages/compiler/src/preview/styleSnapshot';
 import { applyMask, maskLength } from '../packages/ui/src/mask';
 import {
-  parseBlocks, serializeBlocks, toggleInline, parseInline,
+  parseBlocks, serializeBlocks, toggleInline, parseInline, blockOffsets, toggleInlineInValue,
 } from '../packages/ui/src/blocks';
 import { chartModel, normalizeChartData } from '../packages/ui/src/chart';
 import { COLOR_SWATCHES } from '../packages/ui/src/palette';
@@ -562,6 +562,30 @@ test('blocks parity: the page runtime mirrors the TypeScript block model', () =>
     JSON.parse(JSON.stringify(parseInline('Saw the **sunrise** again, *clear* and ++quiet++'))),
     'inline runs parity',
   );
+  const pageOffsets = sandbox['__edOffsets'] as (b: unknown) => unknown;
+  const pageToggleValue = sandbox['__edToggleInValue'] as (
+    b: unknown, s: number, e: number, m: string,
+  ) => { blocks: unknown; start: number; end: number };
+  assert.equal(typeof pageOffsets, 'function');
+  assert.equal(typeof pageToggleValue, 'function');
+  const seed = texts[0];
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(pageOffsets(pageParse(seed)))),
+    JSON.parse(JSON.stringify(blockOffsets(parseBlocks(seed)))),
+    'offsets parity',
+  );
+  const valueToggles: [string, number, number, string][] = [
+    [seed, 26, 33, '**'],
+    ['one **two**\nthree **four**', 4, 26, '**'],
+    [seed, 29, 29, '**'],
+  ];
+  for (const [t, s, e, m] of valueToggles) {
+    const pageOut = pageToggleValue(pageParse(t), s, e, m);
+    const tsOut = toggleInlineInValue(parseBlocks(t), s, e, m);
+    assert.equal(pageSerialize(pageOut.blocks), serializeBlocks(tsOut.blocks), `value toggle parity for ${m}`);
+    assert.equal(pageOut.start, tsOut.start, 'value toggle start parity');
+    assert.equal(pageOut.end, tsOut.end, 'value toggle end parity');
+  }
 });
 
 test('preview behaviour: colour swatches, editor blocks, lightbox close and crumb clicks', () => {
@@ -593,27 +617,38 @@ test('preview behaviour: colour swatches, editor blocks, lightbox close and crum
   const area = findAll(editor, (e) => hasClass(e, 'ed-input'))[0] as unknown as {
     value: string; selectionStart?: number; selectionEnd?: number;
   };
-  assert.ok(area, 'tapping a block opens it for editing');
-  assert.ok(area.value.includes('**sunrise**'), 'the editing block shows its marks');
-  area.selectionStart = 10;
-  area.selectionEnd = 17;
+  assert.ok(area, 'tapping the note opens it for editing');
+  assert.ok(
+    area.value.includes('# Morning pages') && area.value.includes('**sunrise**') && area.value.includes('- [ ] Took photos'),
+    'one field holds the whole note, marks and prefixes showing',
+  );
+  area.selectionStart = 26;
+  area.selectionEnd = 33;
   findAll(editor, (e) => hasClass(e, 'editor-tool') && e.textContent === 'B')[0].click();
   assert.ok(editor.textContent.includes('Saw the sunrise again'), 'one Bold press unwraps the marks');
   assert.ok(!editor.textContent.includes('**sunrise**'), 'no doubled stars after the toggle');
   const area2 = findAll(editor, (e) => hasClass(e, 'ed-input'))[0] as unknown as {
     value: string; selectionStart?: number; selectionEnd?: number;
   };
-  assert.ok(area2, 'the block stays open for editing after a tool press');
-  area2.selectionStart = 8;
-  area2.selectionEnd = 15;
+  assert.ok(area2, 'the field stays open for editing after a tool press');
+  area2.selectionStart = 24;
+  area2.selectionEnd = 31;
   findAll(editor, (e) => hasClass(e, 'editor-tool') && e.textContent === 'B')[0].click();
   assert.ok(editor.textContent.includes('Saw the **sunrise** again'), 'the next Bold press wraps again');
+  findAll(editor, (e) => hasClass(e, 'ed-done'))[0].click();
+  assert.equal(findAll(editor, (e) => hasClass(e, 'ed-input')).length, 0, 'Done settles the note back to its styled face');
+  assert.equal(edBlocks().length, 3, 'the settled note renders as blocks again');
   findAll(editor, (e) => hasClass(e, 'ed-ring'))[0].click();
   assert.ok(editor.textContent.includes('- [x] Took photos'), 'the checklist ring ticked the item');
   const titleText = findAll(editor, (e) => hasClass(e, 'ed-text')).find((e) => e.textContent.includes('Morning pages'))!;
   titleText.click();
   findAll(editor, (e) => hasClass(e, 'editor-chip') && e.textContent === 'Body')[0].click();
   assert.ok(editor.textContent.includes('Notes: Morning pages'), 'the Body chip dropped the title prefix');
+  findAll(editor, (e) => hasClass(e, 'ed-done'))[0].click();
+  findAll(editor, (e) => hasClass(e, 'ed-add'))[0].click();
+  const area3 = findAll(editor, (e) => hasClass(e, 'ed-input'))[0] as unknown as { value: string };
+  assert.ok(area3, 'the add row opens the note for editing');
+  assert.equal(area3.value.split('\n').length, 4, 'the add row appended a fresh block');
 
   const light = previewOf(
     '<screen><lightbox [open]="open" (close)="shut()" src="a.jpg"><p>Cap</p></lightbox><p *ngIf="!open">Closed</p></screen>',

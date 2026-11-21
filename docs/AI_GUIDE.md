@@ -1177,13 +1177,17 @@ built, in three tour examples: `examples/feed/` (Tier 1),
   single star italic, double plus underline, double tilde
   strikethrough; marks are flat and do not nest. The editor is
   one framed unit: the style chips and the parameter tools sit
-  inside the frame, above the blocks. Blocks render styled at
-  rest; tapping a block opens it for editing, and only there do
-  its marks show. Every mark button toggles, the checklist ring
-  taps to tick, Enter starts the next block, and the grip steps
-  the active block up or down. Scope limit, plainly: no tables,
-  no pictures, no nested marks, and the Italic tool's I wears a
-  serif face (Times New Roman on iOS) on purpose.
+  inside the frame, above the blocks, and both rows wrap when
+  the frame is too narrow. Blocks render styled at rest and
+  the checklist ring taps to tick; tapping the note opens the
+  WHOLE note in one field, marks and prefixes showing as text,
+  and Done settles it back to the styled face. In the field,
+  every mark button toggles on the selection, the chips and
+  the checklist, bullet and numbered tools set the kind of the
+  caret's line, and the grip steps the caret's line up or
+  down. Scope limit, plainly: no tables, no pictures, no
+  nested marks, and the Italic tool's I wears a serif face
+  (Times New Roman on iOS) on purpose.
 - **Image declares its size, and the lightbox is an overlay.**
   `<image src width height resize="cover">`; the doctor enforces
   the declared size (`DOC_IMG_SIZE`). `<lightbox [open] (close)
