@@ -3677,7 +3677,7 @@ function __buildColorPicker(el, scope, path, form) {
     sheet.appendChild(hexRow);
     var applyBtn = document.createElement('button');
     applyBtn.type = 'button';
-    applyBtn.className = 'btn btn-text color-apply';
+    applyBtn.className = 'btn color-apply';
     applyBtn.textContent = 'Use this colour';
     applyBtn.addEventListener('click', function () {
       var typed = __hexToHsv(customInput.value);
