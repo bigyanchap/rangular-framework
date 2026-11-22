@@ -152,9 +152,12 @@ function formInitsOf(host: { fields: ComponentField[]; constructorDeps?: { prope
   return out;
 }
 
-/** Preview stand-in for HttpClient: get() returns an Observable that never emits. */
+/** Preview stand-in for HttpClient: every verb returns an Observable that never emits. */
 const HTTP_STUB = {
   get: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }),
+  post: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }),
+  put: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }),
+  delete: () => ({ subscribe: () => ({ unsubscribe: () => undefined }) }),
 };
 
 /** Preview stand-in for Router in the static paint: navigation is a page-runtime behaviour. */
@@ -6073,7 +6076,8 @@ function __buildCore(el, scope, path, form) {
 var __svcCache = {};
 var __instances = {};
 function __httpStub() {
-  return { get: function () { return { subscribe: function () { return { unsubscribe: function () {} }; } }; } };
+  var quiet = function () { return { subscribe: function () { return { unsubscribe: function () {} }; } }; };
+  return { get: quiet, post: quiet, put: quiet, delete: quiet };
 }
 function __resolveDep(token) {
   if (token === 'HttpClient') return __httpStub();
