@@ -4,7 +4,7 @@
 
 # Rangular framework
 
-**Write Angular code, compile React Native code.**
+**Write Angular, Ship React Native.**
 
 The Rangular framework is a standalone transpiler: you write Angular-style code, TypeScript
 classes with `@Component`, HTML-like templates, dependency injection, and
