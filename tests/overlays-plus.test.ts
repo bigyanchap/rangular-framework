@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import * as vm from 'node:vm';
 import { compileComponent, CompileResult } from '../packages/compiler/src/compile';
 import { renderPreview } from '../packages/compiler/src/preview/renderPreview';
+import { ICON_PATHS } from '../packages/ui/src/icons';
 
 // Overlays completion pass: button colour roles. A <button>
 // gains color="primary|danger|neutral"
@@ -139,6 +140,31 @@ test('no picker carries a presentation prop; the picker always opens in a modal'
   const pickers = result.code!.match(/<RgDateTimePicker[^>]*>/g) ?? [];
   assert.equal(pickers.length, 3, result.code!);
   assert.equal(pickers.filter((p) => p.includes('presentation')).length, 0, result.code!);
+});
+
+test('a time picker field wears the clock icon, a date picker keeps the calendar (0.6.4)', () => {
+  const html = `
+<screen>
+  <datetime-picker label="From" mode="time" [value]="when" (change)="onWhen($event)"></datetime-picker>
+  <datetime-picker label="Due" mode="date" [value]="when" (change)="onWhen($event)"></datetime-picker>
+</screen>`;
+  const result = compileFixture(html);
+  assert.deepEqual(result.diagnostics, [], JSON.stringify(result.diagnostics));
+  const page = renderPreview(result.component!, result.ast!, {
+    children: result.children,
+    services: result.services,
+  });
+  const body = page.split('<script')[0];
+  const boxes = body.split('<div class="picker-box">').slice(1);
+  assert.equal(boxes.length, 2, body);
+  assert.ok(boxes[0].includes(ICON_PATHS['schedule'][0]), 'the time field draws the clock');
+  assert.ok(!boxes[0].includes(ICON_PATHS['calendar'][0]), 'the time field does not draw the calendar');
+  assert.ok(boxes[1].includes(ICON_PATHS['calendar'][0]), 'the date field draws the calendar');
+  const primitivesSrc = fs.readFileSync(path.join(ROOT, 'packages', 'ui', 'src', 'primitives.tsx'), 'utf8');
+  assert.ok(
+    primitivesSrc.includes("pickerMode === 'time' ? 'schedule' : 'calendar'"),
+    'the native field picks its icon by mode too',
+  );
 });
 
 test('any picker presentation is a GEN_PICKER_PRESENTATION error (the sheet form is removed)', () => {
