@@ -280,6 +280,8 @@ export function compileComponent(options: CompileOptions): CompileResult {
   const fileSources = new Map<string, string>();
   /** The parsed view of every visited file, kept for the import pass below. */
   const parsedByFile = new Map<string, ClassFileInfo>();
+  /** Literal module constants carried into the generated module (0.6.5), by local binding name. */
+  const carriedConsts = new Map<string, { name: string; text: string }>();
   let entryParsed: ClassFileInfo | undefined;
 
   const visitFile = (fileName: string, source: string): void => {
@@ -347,21 +349,43 @@ export function compileComponent(options: CompileOptions): CompileResult {
         continue;
       }
       visitFile(resolved.fileName, resolved.source);
-      // A resolved file with no compilable class in it contributes
-      // nothing to the generated module, so a name imported from it
-      // and used as a value would be undefined at run time. That
-      // drop used to be silent; report it (GEN_IMPORT_CLASSLESS).
+      // A name imported from another file and used as a value must
+      // reach the generated module. Classes reach it as generated
+      // code; an exported literal constant reaches it by being
+      // carried verbatim (0.6.5), which is what makes the Angular
+      // environment.ts shape work. A resolved file with no
+      // compilable class and no carriable constant for a used name
+      // contributes nothing for that name, so the name would be
+      // undefined at run time. That drop used to be silent; report
+      // it (GEN_IMPORT_CLASSLESS).
       const target = parsedByFile.get(resolved.fileName);
-      if (target && target.components.length === 0 && target.services.length === 0
-        && target.pipes.length === 0 && target.directives.length === 0) {
-        const used = classlessUsedNames(parsed, imp);
-        if (used.length) {
+      if (target) {
+        const used = new Set(classlessUsedNames(parsed, imp));
+        const missing: string[] = [];
+        for (const b of imp.bindings) {
+          if (b.typeOnly || !used.has(b.local)) continue;
+          const konst = b.imported === '*'
+            ? undefined
+            : target.consts.find((c) => c.name === b.imported && c.exported && c.literal);
+          if (konst) {
+            if (!carriedConsts.has(b.local)) {
+              carriedConsts.set(b.local, {
+                name: b.local,
+                text: b.local === konst.name ? konst.text : `const ${b.local} = ${konst.initText};`,
+              });
+            }
+          } else if (target.components.length === 0 && target.services.length === 0
+            && target.pipes.length === 0 && target.directives.length === 0) {
+            missing.push(b.local);
+          }
+        }
+        if (missing.length) {
           diagnostics.push({
             ...error(
               'GEN_IMPORT_CLASSLESS',
-              `Import from '${imp.from}' binds ${used.map((n) => `'${n}'`).join(', ')}, but that file declares no component, service, pipe or directive, so nothing from it reaches the generated code and the name would be undefined at run time`,
+              `Import from '${imp.from}' binds ${missing.map((n) => `'${n}'`).join(', ')}, but that file declares no component, service, pipe or directive and the name is not one of its exported literal constants, so nothing for it reaches the generated code and the name would be undefined at run time`,
               imp.line, undefined,
-              'Move shared values into an @Injectable service and inject it, or declare the values in the class that uses them',
+              'Move shared values into an @Injectable service and inject it, declare the values in the class that uses them, or export them from that file as literal constants (strings, numbers, booleans, and arrays or objects of literals), which the compiler carries into the generated code',
             ),
             file: fileName,
           });
@@ -725,6 +749,7 @@ export function compileComponent(options: CompileOptions): CompileResult {
     directives,
     routes,
     externalImports: { bindings: carriedBindings, sideEffects: carriedSideEffects },
+    consts: [...carriedConsts.values()],
     ...(options.sourceMap
       ? { sourceMap: { entryTsFile: entryKey, entryTemplateFile, contents: fileSources } }
       : {}),

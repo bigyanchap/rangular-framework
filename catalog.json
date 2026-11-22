@@ -1,6 +1,6 @@
 {
   "name": "rangular-framework",
-  "version": "0.6.4",
+  "version": "0.6.5",
   "tags": [
     {
       "tag": "div",
@@ -2694,7 +2694,7 @@
     },
     {
       "code": "GEN_IMPORT_CLASSLESS",
-      "meaning": "A relative import binds names from a file that declares no component, service, pipe or directive. Nothing in that file is carried into the generated code, so a name used from it would be undefined at run time; the compiler reports the import instead of dropping it silently."
+      "meaning": "A relative import binds names from a file that declares no component, service, pipe or directive. Exported constants with literal values in such a file are carried into the generated code (0.6.5); any other name used from it would be undefined at run time, so the compiler reports the import instead of dropping it silently."
     },
     {
       "code": "CMP_TEMPLATE",

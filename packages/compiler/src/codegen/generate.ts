@@ -56,6 +56,13 @@ export interface GenerateContext {
    */
   routes?: ResolvedRoute[];
   /**
+   * Literal module constants carried from classless files (0.6.5):
+   * compile.ts collects the exported literal consts that contributing
+   * classes import and use as values (the environment.ts shape), and
+   * codegen emits them verbatim at module level, before the services.
+   */
+  consts?: { name: string; text: string }[];
+  /**
    * Third-party imports carried from the contributing source files
    * (the entry component's file, the child component files, the
    * providedIn: 'root' service files, the pipe files): compile.ts
@@ -421,7 +428,8 @@ interface StyleEntry {
 
 /**
  * File-level generator (Stage 3). One generated .tsx holds, in order:
- * imports, the @Injectable services as ReactiveService classes, the DI
+ * imports, the literal module constants carried from classless files
+ * (0.6.5), the @Injectable services as ReactiveService classes, the DI
  * container registrations, the child components as exported functions, and
  * finally the entry component as the default export. Sharing one file is
  * what makes the container a true singleton: every component resolves its
@@ -448,6 +456,8 @@ class Generator {
   private childByClassName = new Map<string, ComponentInfo>();
   private rootServices = new Map<string, ServiceInfo>();
   private allServices: ServiceInfo[] = [];
+  /** Literal module constants carried from classless files (0.6.5). */
+  private moduleConsts: { name: string; text: string }[] = [];
   /** The resolved route table (Stage 9), when a routes file was resolved. */
   private routes?: ResolvedRoute[];
   /** Third-party imports to carry into the module (from the context). */
@@ -488,6 +498,7 @@ class Generator {
     this.smConfig = context.sourceMap;
     this.routes = context.routes;
     this.externalImports = context.externalImports;
+    this.moduleConsts = context.consts ?? [];
     for (const child of context.children ?? []) {
       if (child.info.selector) this.childBySelector.set(child.info.selector, child.info);
       this.childByClassName.set(child.info.className, child.info);
@@ -660,6 +671,7 @@ class Generator {
     ]);
     for (const p of this.pipesByName.values()) reserved.add(p.className);
     for (const v of this.pipeInstances.values()) reserved.add(v);
+    for (const c of this.moduleConsts) reserved.add(c.name);
     if (registrations.length) reserved.add('__container');
     if (navLines.length) { reserved.add('__navigator'); reserved.add('__router'); }
     if (snackModuleLines.length) reserved.add('__snackBar');
@@ -682,6 +694,11 @@ class Generator {
       ...carried.notes,
       '',
     ];
+    // Literal module constants carried from classless files (0.6.5):
+    // emitted verbatim at module level, ahead of the services whose
+    // constructors and fields read them.
+    for (const c of this.moduleConsts) lines.push(c.text);
+    if (this.moduleConsts.length) lines.push('');
     for (const block of serviceBlocks) lines.push(...block, '');
     for (const block of pipeBlocks) lines.push(...block, '');
     if (registrations.length) lines.push(...registrations, '');
@@ -3370,14 +3387,42 @@ class Generator {
       methodLines.push('  };');
     }
 
+    // --- Constructor body (0.6.5): runs once on mount, before ngOnInit ----
+    // A component constructor used to be read for its DI parameters
+    // only; its statements were dropped silently. Now the body is
+    // translated like a method body and runs in the mount effect,
+    // ahead of ngOnInit, which is Angular's order.
+    let ctorLines: string[] = [];
+    if (component.constructorBody) {
+      const ctorHost: MethodHost = {
+        fields: component.fields,
+        methods: component.methods,
+        methodDetails: [{
+          name: 'constructor',
+          params: (component.constructorDeps ?? []).map((d) => ({
+            name: d.propertyName,
+            text: `private ${d.propertyName}: ${d.typeName}`,
+          })),
+          body: component.constructorBody,
+        }],
+      };
+      const { methods: ctorTranslated, diagnostics: ctorDiags } = translateMethods(ctorHost, 'react', stateFields, {
+        outputCallbacks,
+        formFields: new Set(formFields.keys()),
+      });
+      diagnostics.push(...ctorDiags);
+      ctorLines = ctorTranslated[0]?.lines ?? [];
+    }
+
     // --- Lifecycle (M6): ngOnInit / ngOnDestroy -> useEffect ----------------
     const lifecycleLines: string[] = [];
     const translatedNames = new Set(translated.map((m) => m.name));
     const hasInit = translatedNames.has('ngOnInit');
     const hasDestroy = translatedNames.has('ngOnDestroy');
-    if (hasInit || hasDestroy) {
+    if (hasInit || hasDestroy || ctorLines.length) {
       this.reactImports.add('useEffect');
       lifecycleLines.push('  useEffect(() => {');
+      for (const line of ctorLines) lifecycleLines.push(line ? `    ${line}` : line);
       if (hasInit) lifecycleLines.push('    ngOnInit();');
       if (hasDestroy) {
         lifecycleLines.push('    return () => {');

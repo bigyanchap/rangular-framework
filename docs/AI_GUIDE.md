@@ -70,7 +70,7 @@ the repo's actual behaviour today (through Stage 12), not aspirations.
 | `@Injectable({ providedIn: 'root' })` services + constructor injection | Wired (Stage 3): services are reactive singletons in a generated container; constructor *parameter properties* (`constructor(private mail: MailService)`) are the injection form; services may inject services |
 | Third-party module imports (npm packages, in a component, child, root service or `@Pipe` file) | Wired: the import is carried into the generated module, specifier and bindings as written (default, named with aliases, namespace, type-only, side-effect), merged across the contributing files and carried once, so generated code may use the imported names freely. A binding whose local name the generated module already defines is dropped with a `GEN_IMPORT_COLLISION` warning. See the Third-party imports section below |
 | Lifecycle hooks (`ngOnInit`, `ngOnDestroy`) | Wired (Stage 3): `ngOnInit` runs once after first render, `ngOnDestroy` on unmount, `useEffect(..., [])` and its cleanup in generated code |
-| `HttpClient.get(url)` returning an Observable you `subscribe` to | Wired with a subset (Stage 3): an Observable-lite with `subscribe(next?, error?)` only; the supported component shape is `this.http.get(url).subscribe((data) => { this.field = data; });` |
+| `HttpClient.get(url)` returning an Observable you `subscribe` to | Wired with a subset (Stage 3): an Observable-lite with `subscribe(next?, error?)` only; the supported component shape is `this.http.get(url).subscribe((data) => { this.field = data; });`. The writing verbs ride the same shape (0.6.5): `post(url, body)` and `put(url, body)` send the body as JSON, `delete(url)` sends no body |
 | Angular Material selection controls | Wired (Stage 6): `switch` mirrors `mat-slide-toggle`, `checkbox` mirrors `mat-checkbox`, `switcher` with `option` mirrors `mat-button-toggle-group`, and `radio-group` with `radio` mirrors `mat-radio-group`; all use `[checked]` or `[value]` in and `(change)` out with the next value as `$event` |
 | Template-driven forms (`[(ngModel)]`, validators as attributes, `#name="ngModel"` refs) | Wired (Stage 8) on `<input>` only: `[(ngModel)]` writes back through the field's state setter, the explicit `[ngModel]` plus `(ngModelChange)` pair works, `required` / `minlength` / `maxlength` / `email` / `pattern` attributes validate with Angular's error shapes, and refs expose `valid` / `invalid` / `touched` / `errors` to template expressions. See the Forms section below for the exact limits |
 | Reactive forms (`FormGroup`, `FormControl`, `Validators` from `@angular/forms`) | Wired (Stage 8): the classes are runtime classes, a group field is a stable ref-held instance, `[formGroup]` plus `formControlName` binds controls, and `profileForm.get('email')` evaluates in template expressions. See the Forms section below |
@@ -85,7 +85,7 @@ the repo's actual behaviour today (through Stage 12), not aspirations.
 |---|---|---|
 | Two-way binding `[(x)]` beyond ngModel | Only `[(ngModel)]` on `<input>` is a real two-way binding (Stage 8). Any other `[(x)]` is *parsed* but degrades to a one-way `[x]` prop binding with no write-back; Stage 6 controls use the explicit `[value]` plus `(change)` pattern instead | Not planned beyond ngModel |
 | NgModules (`@NgModule`, `providers` arrays, module-scoped DI) | Not supported, resolution is import-based instead: `@Component` classes are entry points, and `@Injectable({ providedIn: 'root' })` classes are the injectable services (Stage 3). An `@NgModule` file errors with `CLS_NO_COMPONENT`; an `@Injectable` without `providedIn: 'root'` is not registered, so injecting it is a `DI_UNKNOWN_TOKEN` error | Not planned as modules |
-| Component constructor *bodies* | Not translated, only constructor parameter properties are read (they are the DI declarations). Do one-time setup in `ngOnInit` instead | Not planned |
+| Component constructor *bodies* | Translated like a method body since 0.6.5: the statements run once in the mount effect, before `ngOnInit`, which is Angular's order. Constructor parameter properties remain the DI declarations | Wired (0.6.5) |
 | Animations (`@angular/animations`, `:enter`/`:leave`) | Not supported anywhere in the compiler | Post-v1 |
 | SSR / hydration | Not supported, output is a React Native app, there is no server rendering | Not planned |
 | Full RxJS surface (operators, Subjects, Observables from other sources) | Not supported. Only the Observable-lite exists (`subscribe(next?, error?)`, no operators). The `async` pipe is wired (Stage 12): generated code subscribes in an effect and renders the latest value; the streamed expression is captured at mount, so stream a stable field or service property, not a fresh method call | Later stage |
@@ -1537,8 +1537,9 @@ One framework fix from the tutorial's phone retest: the search variant of `<inpu
   `constructor(private mail: MailService)`. The token is the declared
   type name; it must be a root service in the compilation or
   `HttpClient`, otherwise `DI_UNKNOWN_TOKEN` (error, with fix). Services
-  may inject services the same way. Component constructor bodies are not
-  translated.
+  may inject services the same way. Component constructor bodies are
+  translated like a method body (0.6.5) and run once in the mount
+  effect, before `ngOnInit`.
 - **Lifecycle:** `ngOnInit()` → called inside `useEffect(..., [])`;
   `ngOnDestroy()` → that effect's cleanup. A hook that assigns fields
   makes those fields state, as for any method. In the preview, ngOnInit
@@ -1585,11 +1586,14 @@ One framework fix from the tutorial's phone retest: the search variant of `<inpu
   never be duplicated. Relative imports are followed and their
   classes inlined, as before. One standing limit of that rule:
   only classes resolve through relative imports, so a relative
-  import of a file holding no classes (a plain exported const,
-  say) is not inlined; since the no-silent-drops wave
-  (2026-11-18) a name imported from such a file and used as a
-  value is a `GEN_IMPORT_CLASSLESS` error, while a name used
-  only as a type stays quiet.
+  import of a file holding no classes is not inlined as a class;
+  since 0.6.5 an exported constant with a literal value in such
+  a file (the environment.ts shape: strings, numbers, booleans,
+  and arrays or objects built only of literals) is carried into
+  the generated module verbatim, under its local import name.
+  Any other name imported from such a file and used as a value
+  is a `GEN_IMPORT_CLASSLESS` error (the no-silent-drops wave,
+  2026-11-18), while a name used only as a type stays quiet.
 
 ## HttpClient (Stage 3, M6)
 
@@ -1599,15 +1603,17 @@ One framework fix from the tutorial's phone retest: the search variant of `<inpu
 - The runtime client wraps `fetch` and parses responses as JSON.
   `get(url)` returns an **Observable-lite**: `{ subscribe(next?, error?) }`
   returning `{ unsubscribe() }`. No operators, no `pipe`, no retry,
-  anything richer is not supported yet.
+  anything richer is not supported yet. The writing verbs ride the
+  same shape (0.6.5): `post(url, body)` and `put(url, body)` send
+  the body as JSON, `delete(url)` sends no body.
 - **The one supported component-side shape** is:
   `this.http.get(url).subscribe((data) => { this.field = data; });`,
   a block-bodied arrow whose statements assign component fields (which
   become state as usual). An expression-bodied assignment
   (`subscribe((data) => this.field = data)`) cannot become a setter call
   and degrades to a `METHOD_UNSUPPORTED` warning instead of wrong code.
-- In the preview, `HttpClient` is a stub: `get()` returns an Observable
-  that never emits. Previews never touch the network.
+- In the preview, `HttpClient` is a stub: every verb returns an
+  Observable that never emits. Previews never touch the network.
 
 ## Theming, tokens and snapping (Stage 4)
 
