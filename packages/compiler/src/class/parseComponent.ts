@@ -176,6 +176,30 @@ export interface CarriedImportBinding extends ImportBinding {
   file: string;
 }
 
+/**
+ * A top-level `const` declaration in a source file (0.6.5). A file
+ * that declares no classes can still contribute values: an exported
+ * const whose initializer is a literal (a string, number, boolean,
+ * or an array or object built only of literals) is carried into
+ * the generated module, which is what makes the Angular
+ * environment.ts shape work. Anything else stays uncarried and a
+ * value import of it is reported (GEN_IMPORT_CLASSLESS).
+ */
+export interface ModuleConstInfo {
+  /** The declared name, e.g. 'environment'. */
+  name: string;
+  /** The full declaration as written, normalised to one statement: `const name = <init>;`. */
+  text: string;
+  /** The initializer's source text, for re-emission under an import alias. */
+  initText: string;
+  /** True when the declaration carries the export modifier. */
+  exported: boolean;
+  /** True when the initializer is a literal or built only of literals. */
+  literal: boolean;
+  /** 1-based line of the declaration in its file. */
+  line: number;
+}
+
 /** Everything one TypeScript file contributes to a compilation. */
 export interface ClassFileInfo {
   components: ComponentInfo[];
@@ -184,6 +208,8 @@ export interface ClassFileInfo {
   pipes: PipeInfo[];
   /** Attribute @Directive classes (Stage 12). */
   directives: DirectiveInfo[];
+  /** Top-level const declarations (0.6.5), carried when literal and imported. */
+  consts: ModuleConstInfo[];
   imports: ImportInfo[];
   /** `import A = require(...)` / `import A = B.C` declarations. */
   importEquals: ImportEqualsInfo[];
@@ -228,6 +254,28 @@ function stringOf(node: ts.Expression | undefined): string | undefined {
 function stringArrayOf(node: ts.Expression | undefined): string[] {
   if (!node || !ts.isArrayLiteralExpression(node)) return [];
   return node.elements.map((el) => stringOf(el)).filter((s): s is string => s !== undefined);
+}
+
+/**
+ * True when an expression is a literal, or an array or object built
+ * only of literals (0.6.5): the shapes a module const may take and
+ * still be carried into the generated module verbatim. References,
+ * calls, spreads and shorthand properties are not literals.
+ */
+function isLiteralInitializer(node: ts.Expression): boolean {
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return true;
+  if (ts.isNumericLiteral(node)) return true;
+  if (node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword
+    || node.kind === ts.SyntaxKind.NullKeyword) return true;
+  if (ts.isArrayLiteralExpression(node)) return node.elements.every((el) => isLiteralInitializer(el));
+  if (ts.isObjectLiteralExpression(node)) {
+    return node.properties.every((p) => ts.isPropertyAssignment(p) && isLiteralInitializer(p.initializer));
+  }
+  if (ts.isPrefixUnaryExpression(node)
+    && (node.operator === ts.SyntaxKind.MinusToken || node.operator === ts.SyntaxKind.PlusToken)) {
+    return ts.isNumericLiteral(node.operand);
+  }
+  return false;
 }
 
 /** Fields + methods of a class, shared by component and service reading. */
@@ -464,8 +512,23 @@ export function parseClassFile(tsSource: string, fileName = 'component.ts'): Cla
         column: pos.character + 1,
       };
     });
-  const result: ClassFileInfo = { components: [], services: [], pipes: [], directives: [], imports: [], importEquals: [], parseErrors };
+  const result: ClassFileInfo = { components: [], services: [], pipes: [], directives: [], consts: [], imports: [], importEquals: [], parseErrors };
   const visit = (node: ts.Node): void => {
+    if (ts.isVariableStatement(node) && node.parent === sf) {
+      const exported = (ts.getModifiers(node) ?? []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+      for (const decl of node.declarationList.declarations) {
+        if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+        result.consts.push({
+          name: decl.name.text,
+          text: `const ${decl.getText(sf)};`,
+          initText: decl.initializer.getText(sf),
+          exported,
+          literal: isLiteralInitializer(decl.initializer),
+          line: sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1,
+        });
+      }
+      return;
+    }
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
       const names: string[] = [];
       const bindings: ImportBinding[] = [];

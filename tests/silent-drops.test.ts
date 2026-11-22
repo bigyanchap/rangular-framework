@@ -95,15 +95,18 @@ test('a differently named method next to the same field stays clean', () => {
 });
 
 test('a value used from a classless relative import is a GEN_IMPORT_CLASSLESS error', () => {
+  // Since 0.6.5 an exported literal const in such a file is carried
+  // into the generated module (see the stage3 const tests); a plain
+  // function is not carriable, so its value use still errors loudly.
   const result = project({
-    'app.component.ts': `import { Component } from '@angular/core';\nimport { APP_TITLE } from './constants';\n@Component({ selector: 'app-root', templateUrl: './app.component.html' })\nexport class AppComponent { title = APP_TITLE; }`,
+    'app.component.ts': `import { Component } from '@angular/core';\nimport { appTitle } from './constants';\n@Component({ selector: 'app-root', templateUrl: './app.component.html' })\nexport class AppComponent { title = appTitle(); }`,
     'app.component.html': `<screen><p>{{ title }}</p></screen>`,
-    'constants.ts': `export const APP_TITLE = 'My App';`,
+    'constants.ts': `export function appTitle(): string { return 'My App'; }`,
   });
   const errs = result.diagnostics.filter((d) => d.code === 'GEN_IMPORT_CLASSLESS');
   assert.equal(errs.length, 1, JSON.stringify(result.diagnostics));
   assert.equal(errs[0].severity, 'error');
-  assert.ok(errs[0].message.includes("'APP_TITLE'"), errs[0].message);
+  assert.ok(errs[0].message.includes("'appTitle'"), errs[0].message);
   assert.ok(DIAGNOSTIC_CODES['GEN_IMPORT_CLASSLESS']);
 });
 

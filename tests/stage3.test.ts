@@ -301,6 +301,118 @@ test('HttpClient unsubscribe before resolution suppresses delivery', async () =>
   assert.equal(seen, 0);
 });
 
+test('literal consts from a classless file are carried into the generated module (0.6.5)', () => {
+  const result = compileProject({
+    'environment.ts': `export const environment = { baseUrl: 'https://api.example.com', retries: 2 };\n`,
+    'api.service.ts': [
+      `import { Injectable } from '@angular/core';`,
+      `import { environment } from './environment';`,
+      `@Injectable({ providedIn: 'root' })`,
+      `export class ApiService {`,
+      `  baseUrl = '';`,
+      `  constructor() { this.baseUrl = environment.baseUrl; }`,
+      `}`,
+    ].join('\n'),
+    'app.component.ts': [
+      `import { Component } from '@angular/core';`,
+      `import { ApiService } from './api.service';`,
+      `@Component({ selector: 'app-root', template: '<p>{{ api.baseUrl }}</p>' })`,
+      `export class AppComponent {`,
+      `  constructor(public api: ApiService) {}`,
+      `}`,
+    ].join('\n'),
+  }, 'app.component.ts');
+  assert.equal(hasErrors(result.diagnostics), false, JSON.stringify(result.diagnostics));
+  assert.match(result.code, /const environment = \{ baseUrl: 'https:\/\/api\.example\.com', retries: 2 \};/);
+  assert.match(result.code, /this\.baseUrl = environment\.baseUrl/);
+});
+
+test('an aliased literal const is carried under its local name (0.6.5)', () => {
+  const result = compileProject({
+    'environment.ts': `export const environment = { baseUrl: 'https://api.example.com' };\n`,
+    'api.service.ts': [
+      `import { Injectable } from '@angular/core';`,
+      `import { environment as env } from './environment';`,
+      `@Injectable({ providedIn: 'root' })`,
+      `export class ApiService {`,
+      `  baseUrl = '';`,
+      `  constructor() { this.baseUrl = env.baseUrl; }`,
+      `}`,
+    ].join('\n'),
+    'app.component.ts': [
+      `import { Component } from '@angular/core';`,
+      `import { ApiService } from './api.service';`,
+      `@Component({ selector: 'app-root', template: '<p>{{ api.baseUrl }}</p>' })`,
+      `export class AppComponent {`,
+      `  constructor(public api: ApiService) {}`,
+      `}`,
+    ].join('\n'),
+  }, 'app.component.ts');
+  assert.equal(hasErrors(result.diagnostics), false, JSON.stringify(result.diagnostics));
+  assert.match(result.code, /const env = \{ baseUrl: 'https:\/\/api\.example\.com' \};/);
+  assert.doesNotMatch(result.code, /const environment =/);
+});
+
+test('a non-literal const in a classless file is still GEN_IMPORT_CLASSLESS (0.6.5)', () => {
+  const result = compileProject({
+    'config.ts': `export const stamp = Date.now();\n`,
+    'app.component.ts': [
+      `import { Component } from '@angular/core';`,
+      `import { stamp } from './config';`,
+      `@Component({ selector: 'app-root', template: '<p>Hi</p>' })`,
+      `export class AppComponent {`,
+      `  shown = stamp;`,
+      `}`,
+    ].join('\n'),
+  }, 'app.component.ts');
+  assert.ok(result.diagnostics.some((d) => d.code === 'GEN_IMPORT_CLASSLESS'),
+    JSON.stringify(result.diagnostics));
+});
+
+test('a component constructor body runs in the mount effect, before ngOnInit (0.6.5)', () => {
+  const result = compileProject({
+    'app.component.ts': [
+      `import { Component } from '@angular/core';`,
+      `@Component({ selector: 'app-root', template: '<p>{{ label }}</p>' })`,
+      `export class AppComponent {`,
+      `  label = '';`,
+      `  constructor() { this.boot(); }`,
+      `  boot() { this.label = 'booted'; }`,
+      `  ngOnInit() { this.label = 'init'; }`,
+      `}`,
+    ].join('\n'),
+  }, 'app.component.ts');
+  assert.equal(hasErrors(result.diagnostics), false, JSON.stringify(result.diagnostics));
+  const ctorIdx = result.code.indexOf('boot();');
+  const initIdx = result.code.indexOf('ngOnInit();');
+  assert.ok(ctorIdx >= 0, result.code);
+  assert.ok(initIdx > ctorIdx, result.code);
+  assert.match(result.code, /useEffect\(\(\) => \{\s*boot\(\);/);
+});
+
+test('HttpClient post, put and delete send their method and JSON body (0.6.5)', async () => {
+  const calls: { url: string; method?: string; body?: string }[] = [];
+  const http = new HttpClient(async (url: string, init?: { method?: string; body?: string }) => {
+    calls.push({ url, method: init?.method, body: init?.body });
+    return { json: async () => ({ ok: true }) };
+  });
+  const posted = await new Promise<unknown>((resolve, reject) => {
+    http.post('https://example.com/users', { name: 'Asha' }).subscribe(resolve, reject);
+  });
+  assert.deepEqual(posted, { ok: true });
+  await new Promise<unknown>((resolve, reject) => {
+    http.put('https://example.com/users/1', { name: 'Asha Verma' }).subscribe(resolve, reject);
+  });
+  await new Promise<unknown>((resolve, reject) => {
+    http.delete('https://example.com/users/1').subscribe(resolve, reject);
+  });
+  assert.deepEqual(calls, [
+    { url: 'https://example.com/users', method: 'POST', body: JSON.stringify({ name: 'Asha' }) },
+    { url: 'https://example.com/users/1', method: 'PUT', body: JSON.stringify({ name: 'Asha Verma' }) },
+    { url: 'https://example.com/users/1', method: 'DELETE', body: undefined },
+  ]);
+});
+
 test('ReactiveService notifies subscribers and bumps its version snapshot', () => {
   class CounterService extends ReactiveService {
     n = 0;

@@ -62,7 +62,7 @@ export const DIAGNOSTIC_CODES: Record<string, string> = {
   CLS_NO_COMPONENT: 'No class decorated with @Component was found in the source file.',
   CLS_PARSE: 'The TypeScript source has a syntax error. TypeScript reads on with error recovery, so classes and fields after the error can be silently missing or misread; the compiler reports the parse error itself instead of guessing.',
   GEN_SETTER_COLLISION: 'A component method has the same name as a generated state setter (set + a field name, or a form field touched setter). The generated code would declare the name twice and one would overwrite the other, so the method must be renamed.',
-  GEN_IMPORT_CLASSLESS: 'A relative import binds names from a file that declares no component, service, pipe or directive. Nothing in that file is carried into the generated code, so a name used from it would be undefined at run time; the compiler reports the import instead of dropping it silently.',
+  GEN_IMPORT_CLASSLESS: 'A relative import binds names from a file that declares no component, service, pipe or directive. Exported constants with literal values in such a file are carried into the generated code (0.6.5); any other name used from it would be undefined at run time, so the compiler reports the import instead of dropping it silently.',
   CMP_TEMPLATE: 'The component template could not be resolved (missing inline template and templateUrl).',
   CSS_SELECTOR: 'A CSS selector is not an element or .class selector; the rule was skipped.',
   CSS_DECL: 'A CSS declaration is malformed (expected "property: value").',
