@@ -72,7 +72,7 @@ the repo's actual behaviour today (through Stage 12), not aspirations.
 | Lifecycle hooks (`ngOnInit`, `ngOnDestroy`) | Wired (Stage 3): `ngOnInit` runs once after first render, `ngOnDestroy` on unmount, `useEffect(..., [])` and its cleanup in generated code |
 | `HttpClient.get(url)` returning an Observable you `subscribe` to | Wired with a subset (Stage 3): an Observable-lite with `subscribe(next?, error?)` only; the supported component shape is `this.http.get(url).subscribe((data) => { this.field = data; });`. The writing verbs ride the same shape (0.6.5): `post(url, body)` and `put(url, body)` send the body as JSON, `delete(url)` sends no body |
 | Angular Material selection controls | Wired (Stage 6): `switch` mirrors `mat-slide-toggle`, `checkbox` mirrors `mat-checkbox`, `switcher` with `option` mirrors `mat-button-toggle-group`, and `radio-group` with `radio` mirrors `mat-radio-group`; all use `[checked]` or `[value]` in and `(change)` out with the next value as `$event` |
-| Template-driven forms (`[(ngModel)]`, validators as attributes, `#name="ngModel"` refs) | Wired (Stage 8) on `<input>` only: `[(ngModel)]` writes back through the field's state setter, the explicit `[ngModel]` plus `(ngModelChange)` pair works, `required` / `minlength` / `maxlength` / `email` / `pattern` attributes validate with Angular's error shapes, and refs expose `valid` / `invalid` / `touched` / `errors` to template expressions. See the Forms section below for the exact limits |
+| Template-driven forms (`[(ngModel)]`, validators as attributes, `#name="ngModel"` refs) | Wired (Stage 8) on `<input>` only: `[(ngModel)]` writes back through the field's state setter, the explicit `[ngModel]` plus `(ngModelChange)` pair works, `required` / `minlength` / `maxlength` / `email` / `pattern` attributes validate with Angular's error shapes, and refs expose `valid` / `invalid` / `touched` / `dirty` / `pristine` / `untouched` / `errors` to template expressions. See the Forms section below for the exact limits |
 | Reactive forms (`FormGroup`, `FormControl`, `Validators` from `@angular/forms`) | Wired (Stage 8): the classes are runtime classes, a group field is a stable ref-held instance, `[formGroup]` plus `formControlName` binds controls, and `profileForm.get('email')` evaluates in template expressions. See the Forms section below |
 | `<form (submit)="save()">` | Wired (Stage 8) as a lightweight form element: a `<button type="submit">` inside calls the handler after marking every ngModel input touched (and `markAllAsTouched()` on a reactive group). There is no NgForm object |
 | Routing (`Routes` array, `<router-outlet>`, `routerLink`, `ActivatedRoute`, `Router`) | Wired (Stage 9) in the modern standalone form: the compiler mirrors the `export const routes: Routes = [...]` array that `provideRouter(routes)` consumes, not the historical `RouterModule.forRoot` module form. The root component hosts one `<router-outlet>`; route components are ordinary components imported by the routes file; `routerLink` (string or array form) on a `<button>` or `<row>` compiles to a navigation press; `ActivatedRoute.snapshot.params` and its `paramMap` Observable-lite, and `Router.navigate` / `navigateByUrl`, are runtime classes. See the Routing section below for the exact limits |
@@ -314,7 +314,8 @@ except `required` passes an empty value. Errors are the runtime
 
 - **Template references.** `#email="ngModel"` on an ngModel input
   exposes `email.value`, `email.valid`, `email.invalid`,
-  `email.touched` and `email.errors` to TEMPLATE expressions only:
+  `email.touched`, `email.dirty`, `email.pristine`,
+  `email.untouched` and `email.errors` to TEMPLATE expressions only:
   interpolation, `*ngIf`, `[disabled]`. Method bodies do not see
   refs. The generated code materialises each ref as a small model
   object next to the input's state; the preview computes the same
@@ -324,6 +325,10 @@ except `required` passes an empty value. Errors are the runtime
   error pattern `<p *ngIf="email.invalid && email.touched">` shows
   errors on save even for fields the user never visited, and tracks
   validity live afterwards.
+- **Dirty.** An input becomes dirty the moment the user changes
+  its value: the ngModel write-back latches it, first keystroke,
+  and it never waits for blur. `pristine` is dirty's opposite and
+  `untouched` is touched's opposite, as in Angular.
 - **Not built:** NgForm machinery. No `form.valid` over a
   template-driven form, no `(ngSubmit)` event object, no control
   registry. Gate the submit button with the refs.

@@ -185,8 +185,13 @@ test('signup-form example: zero diagnostics, doctor clean, golden and style snap
 test('signup-form codegen: ngModel write-back, validation models, refs and the submit composition', () => {
   const { result } = compileExample('signup-form');
   const code = result.code;
-  assert.ok(code.includes('value={name} onChangeText={($event) => setName($event)}'), code);
-  assert.ok(code.includes('value={email} onChangeText={($event) => setEmail($event)}'), code);
+  assert.ok(code.includes('value={name} onChangeText={($event) => { setName($event); setNameDirty(true); }}'), code);
+  assert.ok(code.includes('value={email} onChangeText={($event) => { setEmail($event); setEmailDirty(true); }}'), code);
+  // The ref model carries the full Angular state set (0.6.6): dirty
+  // latches on the write-back, pristine and untouched are the
+  // opposites of dirty and touched.
+  assert.ok(code.includes('const [nameDirty, setNameDirty] = useState(false);'), code);
+  assert.ok(code.includes('dirty: nameDirty, pristine: !nameDirty, untouched: !nameTouched'), code);
   assert.ok(code.includes("const nameErrors = validateValue(name, [Validators.required, Validators.minLength(3)]);"), code);
   assert.ok(code.includes('const emailErrors = validateValue(email, [Validators.required, Validators.email]);'), code);
   assert.ok(code.includes('const passwordErrors = validateValue(password, [Validators.required, Validators.minLength(6)]);'), code);

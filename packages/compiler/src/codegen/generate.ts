@@ -2124,6 +2124,7 @@ class Generator {
           ? `value={${info.field}}`
           : `value={${codeExpr(info.expression ?? info.field)}}`);
         if (info.twoWay) textCalls.push(`${setterName(info.field)}($event)`);
+        if (info.twoWay && info.key) textCalls.push(`${setterName(`${info.key}Dirty`)}(true)`);
         if (info.key) blurCalls.push(`${setterName(`${info.key}Touched`)}(true)`);
       } else if (info?.mode === 'valueOnly') {
         props.push(`value={${codeExpr(info.expression ?? '')}}`);
@@ -3318,10 +3319,12 @@ class Generator {
 
     // --- Template-driven validation models (Stage 8) -------------------------
     // One model per ngModel input that declares validators or an
-    // #ref="ngModel": a touched state plus an errors object recomputed
-    // from the field on every render by the runtime validators. The
-    // model is what a template reference reads (email.invalid,
-    // email.touched, email.errors), via the chain-root rewrite in
+    // #ref="ngModel": a touched state (set on blur), a dirty state
+    // (set when the user changes the value) plus an errors object
+    // recomputed from the field on every render by the runtime
+    // validators. The model is what a template reference reads
+    // (email.invalid, email.touched, email.dirty, email.errors), via
+    // the chain-root rewrite in
     // exprToCode.
     const modelLines: string[] = [];
     for (const info of modelInfos) {
@@ -3329,6 +3332,7 @@ class Generator {
       const field = info.field!;
       this.reactImports.add('useState');
       modelLines.push(`  const [${key}Touched, ${setterName(`${key}Touched`)}] = useState(false);`);
+      modelLines.push(`  const [${key}Dirty, ${setterName(`${key}Dirty`)}] = useState(false);`);
       const validSpecs = info.validators.filter((v) => !v.argInvalid);
       for (const v of info.validators) {
         if (!v.argInvalid) continue;
@@ -3349,7 +3353,7 @@ class Generator {
       } else {
         modelLines.push(`  const ${key}Errors = null;`);
       }
-      modelLines.push(`  const ${key}Model = { value: ${field}, errors: ${key}Errors, valid: ${key}Errors === null, invalid: ${key}Errors !== null, touched: ${key}Touched };`);
+      modelLines.push(`  const ${key}Model = { value: ${field}, errors: ${key}Errors, valid: ${key}Errors === null, invalid: ${key}Errors !== null, touched: ${key}Touched, dirty: ${key}Dirty, pristine: !${key}Dirty, untouched: !${key}Touched };`);
     }
 
     // --- Methods: translation (M3) --------------------------------------------
@@ -3369,6 +3373,7 @@ class Generator {
     for (const f of stateFields) generatedSetters.add(setterName(f));
     for (const info of modelInfos) {
       if (info.key) generatedSetters.add(setterName(`${info.key}Touched`));
+      if (info.key) generatedSetters.add(setterName(`${info.key}Dirty`));
     }
     for (const m of translated) {
       if (generatedSetters.has(m.name)) {

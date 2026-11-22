@@ -10,14 +10,17 @@ export default function SignupForm() {
   const [terms, setTerms] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [nameTouched, setNameTouched] = useState(false);
+  const [nameDirty, setNameDirty] = useState(false);
   const nameErrors = validateValue(name, [Validators.required, Validators.minLength(3)]);
-  const nameModel = { value: name, errors: nameErrors, valid: nameErrors === null, invalid: nameErrors !== null, touched: nameTouched };
+  const nameModel = { value: name, errors: nameErrors, valid: nameErrors === null, invalid: nameErrors !== null, touched: nameTouched, dirty: nameDirty, pristine: !nameDirty, untouched: !nameTouched };
   const [emailTouched, setEmailTouched] = useState(false);
+  const [emailDirty, setEmailDirty] = useState(false);
   const emailErrors = validateValue(email, [Validators.required, Validators.email]);
-  const emailModel = { value: email, errors: emailErrors, valid: emailErrors === null, invalid: emailErrors !== null, touched: emailTouched };
+  const emailModel = { value: email, errors: emailErrors, valid: emailErrors === null, invalid: emailErrors !== null, touched: emailTouched, dirty: emailDirty, pristine: !emailDirty, untouched: !emailTouched };
   const [passwordTouched, setPasswordTouched] = useState(false);
+  const [passwordDirty, setPasswordDirty] = useState(false);
   const passwordErrors = validateValue(password, [Validators.required, Validators.minLength(6)]);
-  const passwordModel = { value: password, errors: passwordErrors, valid: passwordErrors === null, invalid: passwordErrors !== null, touched: passwordTouched };
+  const passwordModel = { value: password, errors: passwordErrors, valid: passwordErrors === null, invalid: passwordErrors !== null, touched: passwordTouched, dirty: passwordDirty, pristine: !passwordDirty, untouched: !passwordTouched };
   const onTerms = (value: boolean) => {
     setTerms(value);
   };
@@ -29,15 +32,15 @@ export default function SignupForm() {
       <RgAppbar title="Create account" />
       <RgCard>
         <RgSection>
-          <RgInput label="Full name" placeholder="e.g. Alex Carter" value={name} onChangeText={($event) => setName($event)} onBlur={() => setNameTouched(true)} />
+          <RgInput label="Full name" placeholder="e.g. Alex Carter" value={name} onChangeText={($event) => { setName($event); setNameDirty(true); }} onBlur={() => setNameTouched(true)} />
           {!!((nameModel.invalid && nameModel.touched)) && (
             <RgText variant="bodyLarge">Name is required and needs at least 3 characters.</RgText>
           )}
-          <RgInput keyboardType="email-address" label="Email" placeholder="you@example.com" value={email} onChangeText={($event) => setEmail($event)} onBlur={() => setEmailTouched(true)} />
+          <RgInput keyboardType="email-address" label="Email" placeholder="you@example.com" value={email} onChangeText={($event) => { setEmail($event); setEmailDirty(true); }} onBlur={() => setEmailTouched(true)} />
           {!!((emailModel.invalid && emailModel.touched)) && (
             <RgText variant="bodyLarge">Enter a valid email address.</RgText>
           )}
-          <RgInput secure label="Password" placeholder="At least 6 characters" value={password} onChangeText={($event) => setPassword($event)} onBlur={() => setPasswordTouched(true)} />
+          <RgInput secure label="Password" placeholder="At least 6 characters" value={password} onChangeText={($event) => { setPassword($event); setPasswordDirty(true); }} onBlur={() => setPasswordTouched(true)} />
           {!!((passwordModel.invalid && passwordModel.touched)) && (
             <RgText variant="bodyLarge">Password is required and needs at least 6 characters.</RgText>
           )}
