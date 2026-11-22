@@ -721,17 +721,20 @@ function __eval(e, scope) {
 }
 function __evalSrc(src, scope) { return __eval(__parse(src), scope); }
 var __rootTouched = {};
+var __rootDirty = {};
 function __scope(extra) {
   var s = {}, k;
   for (k in state) s[k] = state[k];
   for (k in methods) s[k] = methods[k];
   if (extra) for (k in extra) s[k] = extra[k];
   // Forms channels (Stage 8): __state is the backing store ngModel
-  // writes land in (scopes are copies), __touched persists per input
-  // across re-renders, __refs carries the live ngModel ref objects.
+  // writes land in (scopes are copies), __touched and __dirty persist
+  // per input across re-renders, __refs carries the live ngModel ref
+  // objects.
   s.__state = state;
   s.__touched = __rootTouched;
-  s.__refs = __refsFor(TEMPLATE.children, state, __rootTouched, s);
+  s.__dirty = __rootDirty;
+  s.__refs = __refsFor(TEMPLATE.children, state, __rootTouched, __rootDirty, s);
   return s;
 }
 function __extend(scope, extra) {
@@ -1887,7 +1890,7 @@ function __evalExprInit(src) {
     return undefined;
   }
 }
-function __refsFor(nodes, stateObj, touched, scope) {
+function __refsFor(nodes, stateObj, touched, dirty, scope) {
   var refs = {};
   function walk(list) {
     (list || []).forEach(function (n) {
@@ -1903,7 +1906,9 @@ function __refsFor(nodes, stateObj, touched, scope) {
           refs[n.ref] = {
             value: stateObj[field], errors: errs,
             valid: errs === null, invalid: errs !== null,
-            touched: !!touched[n.ref]
+            touched: !!touched[n.ref],
+            dirty: !!dirty[n.ref], pristine: !dirty[n.ref],
+            untouched: !touched[n.ref]
           };
         }
       }
@@ -1980,6 +1985,7 @@ function __buildInput(el, scope, form, path) {
     if (mask) { v = __applyMask(v, String(mask)); input.value = v; }
     if (control) control.setValue(v);
     if (tw && field && scope.__state) scope.__state[field] = v;
+    if (tw && field && scope.__dirty && touchedKey) scope.__dirty[touchedKey] = true;
     el.eventBindings.forEach(function (ev) {
       if (ev.name === 'ngModelChange' || ev.name === 'input') __runHandler(ev.expression, scope, v);
     });
@@ -4478,7 +4484,7 @@ function __childInstance(path, def, props) {
   if (!inst) {
     var st = {};
     Object.keys(def.state).forEach(function (k) { st[k] = def.state[k]; });
-    inst = { state: st, props: {}, methods: {}, fresh: true, touched: {} };
+    inst = { state: st, props: {}, methods: {}, fresh: true, touched: {}, dirty: {} };
     Object.keys(def.deps).forEach(function (k) { st[k] = __resolveDep(def.deps[k]); });
     Object.keys(def.formInits || {}).forEach(function (k) { st[k] = __evalFormInit(def.formInits[k]); });
     Object.keys(def.exprInits || {}).forEach(function (k) { st[k] = __evalExprInit(def.exprInits[k]); });
@@ -4497,7 +4503,8 @@ function __childScope(inst, def, content) {
   // Forms channels (Stage 8), the child instance's own stores.
   s.__state = inst.state;
   s.__touched = inst.touched;
-  s.__refs = def ? __refsFor(def.template.children, inst.state, inst.touched, s) : {};
+  s.__dirty = inst.dirty;
+  s.__refs = def ? __refsFor(def.template.children, inst.state, inst.touched, inst.dirty, s) : {};
   return s;
 }
 function __buildChild(el, scope, path) {
