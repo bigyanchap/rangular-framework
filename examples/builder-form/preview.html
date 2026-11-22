@@ -4434,7 +4434,8 @@ function __buildCore(el, scope, path, form) {
 var __svcCache = {};
 var __instances = {};
 function __httpStub() {
-  return { get: function () { return { subscribe: function () { return { unsubscribe: function () {} }; } }; } };
+  var quiet = function () { return { subscribe: function () { return { unsubscribe: function () {} }; } }; };
+  return { get: quiet, post: quiet, put: quiet, delete: quiet };
 }
 function __resolveDep(token) {
   if (token === 'HttpClient') return __httpStub();
