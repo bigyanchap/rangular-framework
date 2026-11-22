@@ -736,7 +736,7 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
       const display = parts ? formatDateTimeValue(parts, mode) : rawValue === undefined ? '' : String(rawValue ?? '');
       return `<div class="field">` +
         (labelText ? `<span class="field-label">${escapeHtml(labelText)}</span>` : '') +
-        `<div class="picker-box"><span class="picker-value">${escapeHtml(display)}</span>${iconSvg('calendar', 20, 'textMuted')}</div>` +
+        `<div class="picker-box"><span class="picker-value">${escapeHtml(display)}</span>${iconSvg(mode === 'time' ? 'schedule' : 'calendar', 20, 'textMuted')}</div>` +
         `</div>`;
     }
     // Data display (Stage 11): these four read their declaration
