@@ -4,7 +4,7 @@
 
 # Rangular framework
 
-**Write Angular, Ship React Native.**
+**Write Angular code, compile React Native code.**
 
 The Rangular framework is a standalone transpiler: you write Angular-style code, TypeScript
 classes with `@Component`, HTML-like templates, dependency injection, and
@@ -17,6 +17,40 @@ Polish is a system, not luck: simple blocks compile to pre-polished
 **Rangular Material** primitives driven by design tokens, see
 [docs/UI_POLISH.md](docs/UI_POLISH.md). The full architecture is in
 [docs/BLOCK_DIAGRAM.md](docs/BLOCK_DIAGRAM.md).
+
+## Quick start: develop your project with the Rangular framework
+
+```sh
+# 1. Install the CLI, once
+npm install -g @rangular-framework/cli
+
+# 2. Create your app (a starter Hello World is inside)
+rg init my-app --app
+
+# 3. Go into the app and install its dependencies
+cd my-app
+npm install
+
+# 4. Compile: rg build reads src/app.component.ts and everything
+#    it imports, and writes one React Native file, src/AppRoot.tsx
+rg build
+
+# 5. Run it, and scan the QR code with Expo Go on your phone
+npx expo start
+```
+
+From there, development is a short loop: edit the Angular code in
+`src/`, run `rg build` again, and the app on your phone refreshes.
+Already have an app? Skip steps 2 and 3: `rg build` in the app
+folder is the whole compile.
+
+The package installs two command names, `rg` and `rangular-framework`.
+If `rg` on your machine is ripgrep, use the long name instead:
+`rangular-framework build`.
+
+One status note: the packages are not on npm yet, so until the first
+publish the same journey runs from a clone, as the Status today
+section of [INSTALLATION.md](INSTALLATION.md) spells out.
 
 ## Modern Angular stance
 
@@ -55,33 +89,13 @@ and it is available on Android and iOS.
 
 ## Install and your first app
 
-The Rangular framework is installed and used the Angular way: install the CLI once,
-create an app with one command, then serve it and watch it run. Expo
-Go on your phone plays the browser's role.
-
-```sh
-# 1. Install the CLI, once (Angular: npm install -g @angular/cli)
-npm install -g @rangular-framework/cli
-
-# 2. Create the app (Angular: ng new my-app). The name is the
-#    argument; the command creates the folder and installs the
-#    app's dependencies itself. A starter Hello World is inside.
-rangular new my-habit-app
-
-# 3. Go into the app
-cd my-habit-app
-
-# 4. Serve it (Angular: ng serve). Scan the QR code with Expo Go;
-#    saving a file recompiles and refreshes the phone.
-rangular serve
-```
-
-Then open `src/app.component.html`, change the greeting, save, and
-watch the phone update. The full guide, including the project naming
-rules and how to rename an app later, is in
-[INSTALLATION.md](INSTALLATION.md). One status note: the packages are
-not on npm yet, so until the first publish the same journey runs from
-a clone, as the Status today section of INSTALLATION.md spells out.
+The [Quick start](#quick-start-develop-your-project-with-the-rangular-framework)
+at the top of this page is the whole journey: install the CLI once,
+create an app with one command, compile with `rg build`, and run it
+with Expo Go on your phone. Then open `src/app.component.html`,
+change the greeting, run `rg build` again, and watch the phone
+update. The full guide, including the project naming rules and how
+to rename an app later, is in [INSTALLATION.md](INSTALLATION.md).
 
 ## Install and run
 
