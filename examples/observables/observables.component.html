@@ -1,0 +1,9 @@
+<screen>
+  <appbar title="Observables"></appbar>
+  <h2>Taps counted by the stream: {{ tapCount }}</h2>
+  <button (click)="tap()">Tap</button>
+  <p>Current mood: {{ mood | async }}</p>
+  <p>Last mood the subscription saw: {{ lastMood }}</p>
+  <button (click)="setMood('Calm')">Calm</button>
+  <button (click)="setMood('Bright')">Bright</button>
+</screen>

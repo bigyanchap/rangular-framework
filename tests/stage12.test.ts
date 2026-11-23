@@ -14,6 +14,7 @@ import {
   formatDateValue, formatNumber, parseDigitsInfo,
 } from '../packages/compiler/src/template/pipes';
 import { pipe, ObservableLite } from '../packages/runtime/src/index';
+import { Subject, of } from 'rxjs';
 
 const ROOT = path.join(__dirname, '..', '..');
 const cliPath = path.join(ROOT, 'dist', 'packages', 'cli', 'src', 'cli.js');
@@ -317,13 +318,9 @@ test('custom pipes: an unsupported transform body degrades with METHOD_UNSUPPORT
 // --- C: the async pipe -----------------------------------------------------------
 
 test('async pipe: the runtime snapshot helper yields the latest synchronous value or null', () => {
-  const two: ObservableLite<string> = {
-    subscribe: (next: (v: string) => void) => { next('a'); next('b'); return { unsubscribe: () => {} }; },
-  };
+  const two: ObservableLite<string> = of('a', 'b');
   assert.equal(pipe('async', two), 'b');
-  const quiet: ObservableLite<string> = {
-    subscribe: () => ({ unsubscribe: () => {} }),
-  };
+  const quiet: ObservableLite<string> = new Subject<string>();
   assert.equal(pipe('async', quiet), null);
   assert.equal(pipe('async', null), null);
   assert.equal(pipe('async', 42), 42, 'a non-observable passes through');

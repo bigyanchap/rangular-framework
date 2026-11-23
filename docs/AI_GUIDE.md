@@ -936,6 +936,52 @@ See `examples/mailbox-pro/` and its recipe card.
   static paint. The interactive preview page runs the full translated
   body, as does the app. Example: `examples/pipes-demo`.
 
+## Observables and RxJS (RxJS adoption, version 0.6.7)
+
+- **Streams are the real RxJS package** (`rxjs` ^7.8.2, a dependency of
+  the runtime package and of every scaffolded app). Imports from
+  `rxjs` in a component or service file carry into the generated
+  module like any other third-party import. There is no home-grown
+  observable shape anymore: the subscribe-only lite type survives
+  only as a compatibility alias (`ObservableLite<T>` = the real
+  `Observable<T>`).
+- **The producers**: `HttpClient` verbs return cold Observables (the
+  fetch fires per subscribe, an unsubscribe before the answer lands
+  drops it, and the stream completes after the value). Form
+  `valueChanges` on a control, group or array is an Observable (a
+  group's emits its value when any descendant changes; an array's
+  also emits on push, insert, removeAt and clear).
+  `ActivatedRoute.paramMap` is backed by a BehaviorSubject, so the
+  current params replay on subscribe. `EventEmitter` extends
+  `Subject`; `emit` is its `next`, and the older `on`/`off` pair
+  still works.
+- **Subscribing** accepts the positional `(next, error)` arrows or
+  an observer object, written exactly as in Angular; both compile
+  as written. Operators compose through `.pipe(...)` as usual:
+  `map`, `filter`, `tap`, `take`, `switchMap`, `catchError`,
+  `distinctUntilChanged`, `debounceTime` and `scan` are the
+  everyday set, and the whole library is available in the app.
+- **Subject fields in components**: a field initialised with
+  `new Subject(...)` (also `BehaviorSubject`, `ReplaySubject`,
+  `AsyncSubject`, with or without type arguments) is one stable
+  instance, held in a ref the way form fields are held; methods
+  and template expressions read it through the ref everywhere.
+  Never assign such a field in a method. In a service, a subject
+  field is an ordinary class field and needs no treatment.
+- **The async pipe** subscribes in an effect and unsubscribes on
+  cleanup, and composes with piped streams and subject fields:
+  `{{ mood | async }}` over a `BehaviorSubject` field shows the
+  current value from the first render.
+- **`await` stays unsupported in methods.** The bridges are
+  `subscribe`, `.then` on a promise, and `firstValueFrom(stream)`
+  or `lastValueFrom(stream)` from rxjs.
+- **Preview boundary**: the browser preview cannot load the
+  package, so its page runtime carries a small mirror (Observable,
+  Subject, BehaviorSubject, ReplaySubject, AsyncSubject, the
+  operators listed above, `of` and `interval`). Behaviour matches
+  for those pieces; anything beyond them runs in the app only.
+  Example: `examples/observables`.
+
 ## Attribute directives (Stage 12)
 
 - **The supported shape is the canonical beginner directive**: an

@@ -343,6 +343,7 @@ function initApp(dirArg: string): void {
       react: '19.3.0',
       'react-native': '0.88.1',
       'react-native-svg': '15.16.0',
+      rxjs: '^7.8.2',
     },
     devDependencies: {
       '@babel/core': '^7.25.2',

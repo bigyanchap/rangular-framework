@@ -46,7 +46,7 @@ translated, and the subset says so instead of guessing:
   still supports.
 - No Signal Forms and no `resource()` / `httpResource()`.
   Forms are the template-driven and reactive APIs, and async
-  data is the HttpClient subscribe form or promises in `.then`
+  data is real RxJS (the next section) or promises in `.then`
   form.
 - Zoneless change detection and OnPush need no stance: there
   is no zone.js and no Angular change detection here at all.
@@ -92,6 +92,35 @@ developer meets first:
 The full delta tables live in `docs/AI_GUIDE.md`. They are
 the contract: if a construct is not listed as supported, the
 compiler will tell you, by code.
+
+## Async is RxJS, and await stays out
+
+Rangular apps use the real RxJS package. The HttpClient verbs,
+form `valueChanges`, the route `paramMap` and `EventEmitter`
+all hand out real Observables and Subjects, and code you write
+can build its own streams with `Subject`, `BehaviorSubject`
+and the operator library, exactly as in Angular.
+
+Earlier versions shipped a small subscribe-only shape behind
+the same call sites. It was replaced, not extended: code that
+compiled could still break at run time the moment it reached
+for `.pipe(...)`, and a framework whose promise is that
+Angular code carries over cannot keep a look-alike at its
+centre. The cost is one dependency (about 40 to 50 KB) in
+every generated app, paid once, openly.
+
+A component field that holds a subject is one stable
+instance for the component's whole life, held the same way
+form fields are held. In a service, a subject is an ordinary
+class field. The browser preview cannot load the package, so
+it carries a small mirror of the common pieces (Observable,
+Subject, BehaviorSubject and the everyday operators); the
+phone runs the real library.
+
+`await` is still not supported in methods. The bridges are
+`subscribe`, `.then` on a promise, and `firstValueFrom` from
+rxjs when one value as a promise is genuinely what the code
+needs.
 
 ## Styling is a CSS subset, snapped to tokens
 

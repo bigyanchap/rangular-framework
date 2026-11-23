@@ -1504,6 +1504,335 @@ function __buildSnackbar(host) {
   host.appendChild(bar);
 }
 // Forms runtime (Stage 8). Plain-JS mirrors of the @rangular-framework/runtime
+// --- Mini RxJS (RxJS adoption) ---------------------------------------
+// Generated apps use the real rxjs package; the preview page cannot
+// load it, so the page carries this small faithful mirror of the
+// pieces apps use: Observable, Subject, BehaviorSubject,
+// ReplaySubject, AsyncSubject, the common operators as the
+// standalone functions user code imports (map, filter, tap, take,
+// switchMap, catchError, distinctUntilChanged, debounceTime) and
+// of(). The semantics match the real library for these pieces:
+// subscribe takes a next, error and complete triple or an observer
+// object, pipe composes operators left to right, unsubscribing runs
+// the source teardown, a Subject multicasts to its current
+// subscribers, and a BehaviorSubject replays its current value to a
+// new subscriber.
+function __rxTeardown(t) {
+  if (!t) return;
+  if (typeof t === 'function') t();
+  else if (typeof t.unsubscribe === 'function') t.unsubscribe();
+}
+function __RxSubscription(teardown) {
+  this.closed = false;
+  this.__teardowns = [];
+  if (teardown) this.__teardowns.push(teardown);
+}
+__RxSubscription.prototype.add = function (t) {
+  if (!t) return;
+  if (this.closed) { __rxTeardown(t); return; }
+  this.__teardowns.push(t);
+};
+__RxSubscription.prototype.unsubscribe = function () {
+  if (this.closed) return;
+  this.closed = true;
+  var ts = this.__teardowns;
+  this.__teardowns = [];
+  ts.forEach(__rxTeardown);
+};
+function __rxObserver(next, error, complete) {
+  if (next && typeof next === 'object') return next;
+  return {
+    next: typeof next === 'function' ? next : undefined,
+    error: typeof error === 'function' ? error : undefined,
+    complete: typeof complete === 'function' ? complete : undefined
+  };
+}
+function __rxSafe(observer, sub) {
+  var stopped = false;
+  return {
+    next: function (v) { if (!stopped && !sub.closed && observer.next) observer.next(v); },
+    error: function (e) {
+      if (stopped || sub.closed) return;
+      stopped = true;
+      try { if (observer.error) observer.error(e); } finally { sub.unsubscribe(); }
+    },
+    complete: function () {
+      if (stopped || sub.closed) return;
+      stopped = true;
+      try { if (observer.complete) observer.complete(); } finally { sub.unsubscribe(); }
+    }
+  };
+}
+function Observable(subscribeFn) { this.__subscribeFn = subscribeFn; }
+Observable.prototype.subscribe = function (next, error, complete) {
+  var sub = new __RxSubscription();
+  var dest = __rxSafe(__rxObserver(next, error, complete), sub);
+  var teardown;
+  try { teardown = this.__subscribeFn ? this.__subscribeFn(dest) : undefined; }
+  catch (e) { dest.error(e); }
+  sub.add(teardown);
+  return sub;
+};
+Observable.prototype.pipe = function () {
+  var src = this;
+  for (var i = 0; i < arguments.length; i++) src = arguments[i](src);
+  return src;
+};
+function Subject() {
+  Observable.call(this);
+  this.__observers = [];
+  this.__stopped = false;
+  this.__hasError = false;
+  this.__errorValue = undefined;
+  var self = this;
+  this.__subscribeFn = function (dest) {
+    if (self.__hasError) { dest.error(self.__errorValue); return undefined; }
+    if (self.__stopped) { dest.complete(); return undefined; }
+    self.__observers.push(dest);
+    return function () {
+      var i = self.__observers.indexOf(dest);
+      if (i >= 0) self.__observers.splice(i, 1);
+    };
+  };
+}
+Subject.prototype = Object.create(Observable.prototype);
+Subject.prototype.next = function (v) {
+  if (this.__stopped || this.__hasError) return;
+  this.__observers.slice().forEach(function (o) { o.next(v); });
+};
+Subject.prototype.error = function (e) {
+  if (this.__stopped || this.__hasError) return;
+  this.__hasError = true;
+  this.__errorValue = e;
+  var obs = this.__observers;
+  this.__observers = [];
+  obs.forEach(function (o) { o.error(e); });
+};
+Subject.prototype.complete = function () {
+  if (this.__stopped || this.__hasError) return;
+  this.__stopped = true;
+  var obs = this.__observers;
+  this.__observers = [];
+  obs.forEach(function (o) { o.complete(); });
+};
+function BehaviorSubject(seed) {
+  Subject.call(this);
+  this.__value = seed;
+  var self = this;
+  var subjectSubscribe = this.__subscribeFn;
+  this.__subscribeFn = function (dest) {
+    var teardown = subjectSubscribe(dest);
+    if (!self.__stopped && !self.__hasError) dest.next(self.__value);
+    return teardown;
+  };
+}
+BehaviorSubject.prototype = Object.create(Subject.prototype);
+BehaviorSubject.prototype.next = function (v) {
+  this.__value = v;
+  Subject.prototype.next.call(this, v);
+};
+BehaviorSubject.prototype.getValue = function () { return this.__value; };
+function ReplaySubject(bufferSize) {
+  Subject.call(this);
+  this.__buffer = [];
+  this.__bufferSize = bufferSize === undefined ? Infinity : bufferSize;
+  var self = this;
+  var subjectSubscribe = this.__subscribeFn;
+  this.__subscribeFn = function (dest) {
+    if (self.__stopped || self.__hasError) {
+      self.__buffer.slice().forEach(function (v) { dest.next(v); });
+      return subjectSubscribe(dest);
+    }
+    var teardown = subjectSubscribe(dest);
+    self.__buffer.slice().forEach(function (v) { dest.next(v); });
+    return teardown;
+  };
+}
+ReplaySubject.prototype = Object.create(Subject.prototype);
+ReplaySubject.prototype.next = function (v) {
+  this.__buffer.push(v);
+  while (this.__buffer.length > this.__bufferSize) this.__buffer.shift();
+  Subject.prototype.next.call(this, v);
+};
+function AsyncSubject() {
+  Subject.call(this);
+  this.__last = undefined;
+  this.__hasLast = false;
+}
+AsyncSubject.prototype = Object.create(Subject.prototype);
+AsyncSubject.prototype.next = function (v) { this.__last = v; this.__hasLast = true; };
+AsyncSubject.prototype.complete = function () {
+  if (this.__hasLast) Subject.prototype.next.call(this, this.__last);
+  Subject.prototype.complete.call(this);
+};
+function map(fn) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var inner = source.subscribe({
+        next: function (v) { var r; try { r = fn(v); } catch (e) { dest.error(e); return; } dest.next(r); },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function filter(fn) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var inner = source.subscribe({
+        next: function (v) { var keep; try { keep = fn(v); } catch (e) { dest.error(e); return; } if (keep) dest.next(v); },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function tap(fn) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var inner = source.subscribe({
+        next: function (v) { try { fn(v); } catch (e) { dest.error(e); return; } dest.next(v); },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function take(count) {
+  return function (source) {
+    return new Observable(function (dest) {
+      if (count <= 0) { dest.complete(); return undefined; }
+      var seen = 0;
+      var inner = source.subscribe({
+        next: function (v) {
+          seen++;
+          dest.next(v);
+          if (seen >= count) dest.complete();
+        },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function distinctUntilChanged() {
+  return function (source) {
+    return new Observable(function (dest) {
+      var has = false;
+      var prev;
+      var inner = source.subscribe({
+        next: function (v) { if (!has || v !== prev) { has = true; prev = v; dest.next(v); } },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function debounceTime(ms) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var timer = null;
+      var pending;
+      var hasPending = false;
+      var inner = source.subscribe({
+        next: function (v) {
+          pending = v;
+          hasPending = true;
+          if (timer !== null) clearTimeout(timer);
+          timer = setTimeout(function () {
+            timer = null;
+            if (hasPending) { hasPending = false; dest.next(pending); }
+          }, ms);
+        },
+        error: function (e) { dest.error(e); },
+        complete: function () {
+          if (timer !== null) { clearTimeout(timer); timer = null; }
+          if (hasPending) { hasPending = false; dest.next(pending); }
+          dest.complete();
+        }
+      });
+      return function () { if (timer !== null) clearTimeout(timer); inner.unsubscribe(); };
+    });
+  };
+}
+function switchMap(fn) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var innerSub = null;
+      var outerDone = false;
+      var outer = source.subscribe({
+        next: function (v) {
+          var innerObs;
+          try { innerObs = fn(v); } catch (e) { dest.error(e); return; }
+          if (innerSub) innerSub.unsubscribe();
+          innerSub = innerObs.subscribe({
+            next: function (iv) { dest.next(iv); },
+            error: function (e) { dest.error(e); },
+            complete: function () { innerSub = null; if (outerDone) dest.complete(); }
+          });
+        },
+        error: function (e) { dest.error(e); },
+        complete: function () { outerDone = true; if (!innerSub) dest.complete(); }
+      });
+      return function () { outer.unsubscribe(); if (innerSub) innerSub.unsubscribe(); };
+    });
+  };
+}
+function catchError(fn) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var recovery = null;
+      var inner = source.subscribe({
+        next: function (v) { dest.next(v); },
+        error: function (e) {
+          var nextObs;
+          try { nextObs = fn(e); } catch (e2) { dest.error(e2); return; }
+          recovery = nextObs.subscribe({
+            next: function (v) { dest.next(v); },
+            error: function (e2) { dest.error(e2); },
+            complete: function () { dest.complete(); }
+          });
+        },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); if (recovery) recovery.unsubscribe(); };
+    });
+  };
+}
+function of() {
+  var values = Array.prototype.slice.call(arguments);
+  return new Observable(function (dest) {
+    values.forEach(function (v) { dest.next(v); });
+    dest.complete();
+    return undefined;
+  });
+}
+function scan(fn, seed) {
+  return function (source) {
+    return new Observable(function (dest) {
+      var acc = seed;
+      var inner = source.subscribe({
+        next: function (v) { try { acc = fn(acc, v); } catch (e) { dest.error(e); return; } dest.next(acc); },
+        error: function (e) { dest.error(e); },
+        complete: function () { dest.complete(); }
+      });
+      return function () { inner.unsubscribe(); };
+    });
+  };
+}
+function interval(ms) {
+  return new Observable(function (dest) {
+    var n = 0;
+    var id = setInterval(function () { dest.next(n); n++; }, ms);
+    return function () { clearInterval(id); };
+  });
+}
+
 // forms core (Validators, FormControl, FormGroup semantics and error
 // shapes), plus the mini evaluator for form field initializers and the
 // ngModel ref builder. The preview never uses eval on author code: the
@@ -1579,16 +1908,19 @@ function __validatorsOf(el, scope) {
 }
 function __makeControl(args) {
   var spec = args.length > 1 ? args[1] : null;
+  var changes = new Subject();
   var c = {
     value: args.length ? args[0] : null,
     touched: false,
     dirty: false,
     errors: null,
+    valueChanges: changes,
     __validators: spec === null || spec === undefined ? [] : (Array.isArray(spec) ? spec : [spec]),
     setValue: function (v) {
       c.value = v;
       c.dirty = true;
       c.errors = __validateValue(c.value, c.__validators);
+      changes.next(v);
     },
     patchValue: function (v) { c.setValue(v); },
     markAsTouched: function () { c.touched = true; },
@@ -1639,19 +1971,36 @@ function __makeGroup(controls) {
       return Object.keys(g.controls).some(function (k) { return g.controls[k].touched; });
     }
   });
+  g.valueChanges = new Observable(function (dest) {
+    var subs = Object.keys(g.controls).map(function (k) {
+      return g.controls[k].valueChanges.subscribe(function () { dest.next(g.value); });
+    });
+    return function () { subs.forEach(function (s) { s.unsubscribe(); }); };
+  });
   return g;
 }
 function __setNodeValue(node, v) {
   if (node && node.setValue) node.setValue(v);
 }
 function __makeArray(controls) {
+  var changes = new Subject();
+  var watched = [];
+  function watch(c) {
+    if (c && c.valueChanges) watched.push({ c: c, sub: c.valueChanges.subscribe(function () { changes.next(a.value); }) });
+  }
+  function unwatch(c) {
+    for (var i = watched.length - 1; i >= 0; i--) {
+      if (watched[i].c === c) { watched[i].sub.unsubscribe(); watched.splice(i, 1); }
+    }
+  }
   var a = {
     controls: controls || [],
+    valueChanges: changes,
     at: function (i) { return a.controls[i]; },
-    push: function (c) { a.controls.push(c); },
-    insert: function (i, c) { a.controls.splice(i, 0, c); },
-    removeAt: function (i) { a.controls.splice(i, 1); },
-    clear: function () { a.controls.length = 0; },
+    push: function (c) { a.controls.push(c); watch(c); changes.next(a.value); },
+    insert: function (i, c) { a.controls.splice(i, 0, c); watch(c); changes.next(a.value); },
+    removeAt: function (i) { var gone = a.controls.splice(i, 1)[0]; if (gone) unwatch(gone); changes.next(a.value); },
+    clear: function () { a.controls.forEach(unwatch); a.controls.length = 0; changes.next(a.value); },
     markAllAsTouched: function () {
       a.controls.forEach(function (c) {
         if (c.markAllAsTouched) c.markAllAsTouched();
@@ -1682,6 +2031,7 @@ function __makeArray(controls) {
   Object.defineProperty(a, 'dirty', {
     get: function () { return a.controls.some(function (c) { return c.dirty; }); }
   });
+  a.controls.forEach(watch);
   return a;
 }
 // FormBuilder mirrors: a config entry that is already a node (it
@@ -1880,6 +2230,15 @@ function __evalExprInit(src) {
       return new (Date.bind.apply(Date, [null].concat(args)))();
     }
     if (/^Date\.now\s*\(\s*\)$/.test(s)) return Date.now();
+    var sm = /^new\s+(Subject|BehaviorSubject|ReplaySubject|AsyncSubject)\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)$/.exec(s);
+    if (sm) {
+      var sargs = sm[2].replace(/^\s+|\s+$/g, '');
+      var svals = sargs ? __eval(__parse('[' + sargs + ']'), {}) : [];
+      if (sm[1] === 'BehaviorSubject') return new BehaviorSubject(svals[0]);
+      if (sm[1] === 'ReplaySubject') return new ReplaySubject(svals[0]);
+      if (sm[1] === 'AsyncSubject') return new AsyncSubject();
+      return new Subject();
+    }
     return __eval(__parse(s), {});
   } catch (err) {
     console.warn('preview: cannot evaluate field initializer', err);
@@ -4435,7 +4794,10 @@ function __buildCore(el, scope, path, form) {
 var __svcCache = {};
 var __instances = {};
 function __httpStub() {
-  var quiet = function () { return { subscribe: function () { return { unsubscribe: function () {} }; } }; };
+  // The preview never touches the network: every verb returns an
+  // Observable that never emits, but pipes like the real one, so a
+  // .pipe(...).subscribe(...) chain in a method runs and waits.
+  var quiet = function () { return new Observable(function () { return undefined; }); };
   return { get: quiet, post: quiet, put: quiet, delete: quiet };
 }
 function __resolveDep(token) {
@@ -4613,12 +4975,7 @@ function __activatedRouteObj(params) {
   var p = params || {};
   return {
     snapshot: { params: p },
-    paramMap: {
-      subscribe: function (next) {
-        if (next) next(p);
-        return { unsubscribe: function () {} };
-      }
-    }
+    paramMap: new BehaviorSubject(p)
   };
 }
 function __navTarget(el, scope) {
