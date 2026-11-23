@@ -271,7 +271,7 @@ test('codegen: formArrayName rows wire through .at(i), and rows are born in meth
   }, 'team.component.ts');
   assert.deepEqual(result.diagnostics, [], JSON.stringify(result.diagnostics));
   const code = result.code;
-  assert.ok(code.includes("import { FormArray, FormControl, FormGroup, Validators } from '@rangular-framework/runtime';"), code);
+  assert.ok(code.includes("import { FormArray, FormControl, FormGroup, SignalRenderTracker, Validators } from '@rangular-framework/runtime';"), code);
   assert.ok(code.includes("value={teamFormRef.current.get('members').at(i).value}"), code);
   assert.ok(code.includes("onChangeText={($event) => teamFormRef.current.get('members').at(i).setValue($event)}"), code);
   assert.ok(code.includes("teamFormRef.current.get('members').at(i).markAsTouched?.()"), code);

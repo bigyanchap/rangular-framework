@@ -91,7 +91,8 @@ the repo's actual behaviour today (through Stage 12), not aspirations.
 | Full RxJS surface (operators, Subjects, Observables from other sources) | Not supported. Only the Observable-lite exists (`subscribe(next?, error?)`, no operators). The `async` pipe is wired (Stage 12): generated code subscribes in an effect and renders the latest value; the streamed expression is captured at mount, so stream a stable field or service property, not a fresh method call | Later stage |
 | `*ngIf` with `else` / `then` | Detected, warns `GEN_NGIF_ELSE_TODO`, element emitted unconditionally. Workaround: two elements, `*ngIf="cond"` and `*ngIf="!(cond)"` | Later stage |
 | Built-in control flow (`@if`, `@for`, `@switch`) and `@defer` | Not supported. Templates use the structural directives `*ngIf` and `*ngFor`; there are no lazy template blocks | Not planned |
-| Signals as component state (`signal()`, `computed()`, `input()`, `output()`) | Not supported. State is plain class fields; inputs and outputs are the `@Input()` / `@Output()` decorators. The runtime package's tiny `signal()` helper is a service-side utility, not the component model | Not planned |
+| Signals as component state (`signal()`, `computed()`, `effect()`, `untracked()`) | Supported since 0.7.0 with Angular's syntax and semantics: read by calling, `set` / `update` to write, automatic dependency tracking, lazy cached `computed`, effects created in the constructor or `ngOnInit` destroyed with the component. A signal write re-renders the components whose views read it (component granularity, not per-binding). See the Signals section below | Supported (0.7.0) |
+| Signal inputs and outputs (`input()`, `output()`, `model()`) | Not supported. Inputs and outputs are the `@Input()` / `@Output()` decorators | Not planned |
 | Signal Forms, `resource()` / `httpResource()` | Not supported. Forms are the Stage 8 template-driven and reactive APIs; async data is the HttpClient subscribe form or promises in `.then` form | Not planned |
 | Two structural directives on one element (`*ngIf` and `*ngFor` together) | Detected, warns `TPL_STRUCTURAL_MULTIPLE`: the first directive is kept, each later one is dropped and named in a TODO comment in the generated code. Nest one element inside the other instead | Enforced (the keep-first degrade is the v1 behaviour) |
 | `[class]` / `[ngClass]` whole-value class bindings | Detected, warns `GEN_CLASS_BINDING`, binding dropped: a dynamic class string cannot be resolved to StyleSheet entries at compile time. Toggle one declared class with `[class.name]="cond"` instead (supported, see the styling notes) | Not planned |
@@ -981,6 +982,68 @@ See `examples/mailbox-pro/` and its recipe card.
   operators listed above, `of` and `interval`). Behaviour matches
   for those pieces; anything beyond them runs in the app only.
   Example: `examples/observables`.
+
+## Signals (signals adoption, version 0.7.0)
+
+- **The core is the runtime package's reactive graph**
+  (`signal`, `computed`, `effect`, `untracked` from
+  `@angular/core` in source, re-homed to
+  `@rangular-framework/runtime` in generated code). Semantics
+  mirror Angular: a signal is read by calling it (`count()`),
+  written with `set` or `update`, and compared with
+  `Object.is` unless an `equal` option says otherwise;
+  dependency tracking is automatic, so a `computed` or an
+  effect follows whatever it read on its last run; a
+  `computed` is lazy (nothing runs until the first read),
+  cached (unchanged inputs return the cached value), and
+  glitch-free (a chain never observes a half-updated mix,
+  and a computed whose output settles to the same value does
+  not disturb its own readers). Writing a signal inside a
+  `computed` throws, as in Angular. `untracked(fn)` reads
+  without subscribing the reader.
+- **Fields**: a component field initialised with `signal(...)`
+  or `computed(...)` is one stable instance held in a ref,
+  like a Subject field; methods and templates read it through
+  the ref, so the author's syntax survives word for word.
+  Never assign such a field in a method. In a service, the
+  same field is a plain class field, emitted verbatim, and a
+  service `computed` reads the service's own signals through
+  `this` as written.
+- **Reactivity bridge**: every generated component carries a
+  render tracker that is open while its view is evaluated, so
+  every signal the view reads, directly, through a method it
+  calls, or through an injected service, subscribes exactly
+  that component, and a write re-renders its readers. The
+  granularity is the component: React re-renders components,
+  where Angular updates the single binding. The values on
+  screen are the same.
+- **Effects**: `effect(fn)` runs `fn` once at creation and
+  re-runs it when a dependency changes, through a queue
+  flushed on a microtask, never inside the write itself
+  (`flushEffects()` runs the queue synchronously, for tests).
+  `fn` receives `onCleanup` to register teardown that runs
+  before each re-run and at destroy. An effect created in a
+  component constructor or `ngOnInit` is destroyed when the
+  component unmounts; an effect created anywhere else still
+  runs but is not destroyed with the component, and codegen
+  warns `GEN_SIGNAL_EFFECT_CONTEXT`. An effect created by a
+  root service lives for the app's life, as in Angular.
+- **The computed scope rule**: inside `computed(...)`, only
+  signal and computed fields and signals on injected services
+  may be read. A read of a plain field or a method cannot be
+  tracked; codegen warns `GEN_SIGNAL_SCOPE` and declares the
+  field undefined. Derive from plain fields with a method
+  instead, which the template calls fresh on every render.
+- **Not in this version, by name**: the signal forms of
+  inputs and outputs (`input()`, `output()`, `model()`) and
+  the RxJS bridge (`toSignal`, `toObservable`). Inputs and
+  outputs stay the `@Input()` / `@Output()` decorators, and
+  streams stay RxJS.
+- **Preview boundary**: the browser preview carries a
+  plain-JS mirror of the core with the same semantics; its
+  one simplification is that effects re-run synchronously
+  when a dependency changes instead of through the queue.
+  Example: `examples/signals`.
 
 ## Attribute directives (Stage 12)
 

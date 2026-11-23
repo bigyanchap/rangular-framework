@@ -29,18 +29,16 @@ never the historical `RouterModule.forRoot` module form. An
 `@NgModule` file is an error (`CLS_NO_COMPONENT`), not a
 starting point.
 
-## The newest Angular syntax is not in the subset
+## The newest Angular syntax, signals aside, is not in the subset
 
-Angular's current wave (signals for component state, the
-built-in control flow, Signal Forms, `resource()`) is not
-translated, and the subset says so instead of guessing:
+Signals for component state joined the subset in 0.7.0 (a
+section below covers them). The rest of Angular's
+current wave (the built-in control flow, Signal Forms,
+`resource()`) is not translated, and the subset says so
+instead of guessing:
 
-- No `signal()`, `computed()` or `input()` / `output()`
-  functions in components. State is plain class fields, and
-  inputs and outputs are the `@Input()` / `@Output()`
-  decorators. (The runtime package carries a tiny `signal()`
-  helper for services; it is a utility, not Angular's signal
-  component model.)
+- No `input()` / `output()` / `model()` functions. Inputs
+  and outputs are the `@Input()` / `@Output()` decorators.
 - No `@if`, `@for`, `@switch` blocks and no `@defer`.
   Templates use `*ngIf` and `*ngFor`, which current Angular
   still supports.
@@ -121,6 +119,34 @@ phone runs the real library.
 `subscribe`, `.then` on a promise, and `firstValueFrom` from
 rxjs when one value as a promise is genuinely what the code
 needs.
+
+## Signals are Angular's, at component granularity
+
+Since 0.7.0, `signal()`, `computed()`, `effect()` and
+`untracked()` work in components and services with Angular's
+syntax and semantics: a signal is read by calling it and
+written with `set` or `update`; dependency tracking is
+automatic; a `computed` value is lazy, cached, and never
+observes a half-updated mix of its inputs; an effect runs at
+creation and re-runs when what it read changes, and one
+created in a constructor or `ngOnInit` is destroyed with its
+component. The runtime package implements the core; the
+browser preview mirrors it.
+
+One difference is deliberate, and it is about React, not
+about signals: Angular updates the exact binding that read a
+signal, while React re-renders components. A signal write
+here re-renders exactly the components whose views read it,
+and nothing finer. The values on screen are Angular's; the
+unit of re-rendering is the component. Finer granularity is
+a possible later refinement, not a silent promise.
+
+Two neighbours stay out for now, by name: the signal forms
+of inputs and outputs (`input()`, `output()`, `model()`),
+and the RxJS bridge (`toSignal`, `toObservable`). Plain
+fields also keep their existing contract alongside signals:
+assignment updates every reader, and a value derived from
+plain fields is computed by a method on read.
 
 ## Styling is a CSS subset, snapped to tokens
 

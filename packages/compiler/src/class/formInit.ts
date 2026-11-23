@@ -69,6 +69,29 @@ export function isFormInitializer(initializer: string | undefined, builderDeps?:
   return !!m && !!builderDeps && builderDeps.has(m[1]);
 }
 
+const SIGNAL_CALL_RE = /^\s*(signal|computed)\s*(<[^>]*>)?\s*\(/;
+
+export type SignalKind = 'signal' | 'computed';
+
+/**
+ * The kind of a signal field initializer (signals adoption): a field
+ * initialised with `signal(...)` or `computed(...)` from
+ * '@angular/core'. Like a subject field, a signal field is one stable
+ * instance for the component's whole life: codegen holds it in a ref,
+ * because a signal recreated per render would lose its value and
+ * orphan every reader. In a service the same initializer is a plain
+ * class field, emitted verbatim.
+ */
+export function signalKindOf(initializer: string | undefined): SignalKind | undefined {
+  if (!initializer) return undefined;
+  const m = SIGNAL_CALL_RE.exec(initializer);
+  return m ? (m[1] as SignalKind) : undefined;
+}
+
+export function isSignalInitializer(initializer: string | undefined): boolean {
+  return signalKindOf(initializer) !== undefined;
+}
+
 const STREAM_NEW_RE = /^\s*new\s+(Subject|BehaviorSubject|ReplaySubject|AsyncSubject)\s*(<[^>]*>)?\s*\(/;
 
 /**

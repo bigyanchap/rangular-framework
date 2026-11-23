@@ -20,7 +20,7 @@ test('a field assigned in a method becomes useState state', () => {
     count = 0;
     bump() { this.count++; }
   `);
-  assert.match(code, /import \{ useState \} from 'react';/);
+  assert.match(code, /import \{ useEffect, useReducer, useRef, useState \} from 'react';/);
   assert.match(code, /const \[count, setCount\] = useState\(0\);/);
 });
 

@@ -4,7 +4,7 @@ import { CHART_TYPES } from '../../../ui/src/chart';
 import { CarriedImportBinding, ComponentInfo, DirectiveInfo, PipeInfo, ServiceInfo } from '../class/parseComponent';
 import { DirectiveStyleAssign, directiveStyles } from '../class/parseDirective';
 import { ResolvedRoute } from '../class/parseRoutes';
-import { analyzeFormInitializer, builderDepsOf, FormFieldInfo, isFormInitializer, isStreamInitializer, rewriteBuilderInitializer } from '../class/formInit';
+import { analyzeFormInitializer, builderDepsOf, FormFieldInfo, isFormInitializer, isSignalInitializer, isStreamInitializer, rewriteBuilderInitializer, signalKindOf } from '../class/formInit';
 import { Diagnostic, error, warning } from '../diagnostics';
 import { nearestOnScale, ParsedCss } from '../style/css';
 import { ElementNode, EventBinding, TemplateNode, TemplateRoot } from '../template/ast';
@@ -895,6 +895,13 @@ class Generator {
     for (const field of svc.fields) {
       if (field.initializer && isLiteralInitializer(field.initializer)) {
         lines.push(`  ${field.name}${field.type ? `: ${field.type}` : ''} = ${field.initializer};`);
+      } else if (field.initializer && isSignalInitializer(field.initializer)) {
+        // Signals adoption: a service is a real class, so a signal or
+        // computed field is emitted verbatim as a class field; its
+        // arrow bodies keep this.<field> reads, which are correct
+        // against the instance. The runtime name joins the import.
+        this.usedRuntime.add(signalKindOf(field.initializer) === 'computed' ? 'computed' : 'signal');
+        lines.push(`  ${field.name}${field.type ? `: ${field.type}` : ''} = ${field.initializer};`);
       } else if (field.initializer) {
         this.diagnostics.push(warning('GEN_FIELD', `Service '${svc.className}': field '${field.name}' has a non-literal initializer; not hoisted`, undefined, undefined, `Initialise '${field.name}' with a literal (including arrays/objects of literals) or assign it in the constructor`));
         lines.push(`  // TODO: field '${forLineComment(field.name)}' has a non-literal initializer (${forLineComment(field.initializer)}), not hoisted; wire it up manually for now.`);
@@ -927,6 +934,12 @@ class Generator {
     }
     const { methods, diagnostics } = translateMethods(svc, 'service', new Set(svc.fields.map((f) => f.name)));
     this.diagnostics.push(...diagnostics);
+    // Signals adoption: an effect created by a service (a root
+    // singleton) lives for the app's life, which matches Angular; it
+    // only needs the runtime name in the file's import.
+    if (svc.methodDetails.some((m) => m.body && /\beffect\s*\(/.test(m.body)) || (svc.constructorBody && /\beffect\s*\(/.test(svc.constructorBody))) {
+      this.usedRuntime.add('effect');
+    }
     for (const m of methods) {
       lines.push(`  ${m.name}(${m.paramTexts.join(', ')}) {`);
       for (const line of m.lines) lines.push(line ? `    ${line}` : line);
@@ -1433,6 +1446,19 @@ class Generator {
       if (isStreamInitializer(field.initializer)) streamFields.add(field.name);
     }
 
+    // Signal fields (signals adoption): a field initialised with
+    // signal(...) or computed(...) from '@angular/core' is one stable
+    // reactive value for the component's whole life, held in a ref
+    // like a stream field. Reads and writes in methods and templates
+    // route through the ref, so the author's Angular syntax
+    // (count(), count.set(...), double()) survives word for word.
+    const signalFields = new Map<string, 'signal' | 'computed'>();
+    for (const field of component.fields) {
+      if (field.isInput || field.isOutput) continue;
+      const kind = signalKindOf(field.initializer);
+      if (kind) signalFields.set(field.name, kind);
+    }
+
     // ngModel belongs on <input> only in this version, and a two-way
     // ngModel field becomes state by definition (Angular semantics: the
     // binding itself writes the field).
@@ -1464,6 +1490,7 @@ class Generator {
       if (field.isInput || field.isOutput) continue;
       if (formFields.has(field.name)) continue;
       if (streamFields.has(field.name)) continue;
+      if (signalFields.has(field.name)) continue;
       if (field.initializer && isLiteralInitializer(field.initializer)
         && (mutated.has(field.name) || ngModelStateFields.has(field.name))) {
         stateFields.add(field.name);
@@ -1771,6 +1798,7 @@ class Generator {
     const identRenames = new Map<string, string>();
     for (const name of formFields.keys()) identRenames.set(name, `${name}Ref.current`);
     for (const name of streamFields) identRenames.set(name, `${name}Ref.current`);
+    for (const name of signalFields.keys()) identRenames.set(name, `${name}Ref.current`);
     const refBases = new Map<string, string>();
     for (const info of modelInfos) {
       if (info.refName) refBases.set(info.refName, `${info.key}Model`);
@@ -3271,6 +3299,7 @@ class Generator {
       if (field.isInput || field.isOutput) continue;
       if (formFields.has(field.name)) continue; // Stage 8: a ref below, not state.
       if (streamFields.has(field.name)) continue; // RxJS adoption: a ref below, not a per-render const.
+      if (signalFields.has(field.name)) continue; // Signals adoption: a ref below, not a per-render const.
       if (field.initializer && isLiteralInitializer(field.initializer)) {
         if (stateFields.has(field.name)) {
           fieldLines.push(`  const [${field.name}, ${setterName(field.name)}] = useState(${field.initializer});`);
@@ -3286,6 +3315,26 @@ class Generator {
       }
     }
 
+    // A computed() initializer's arrow reads its inputs through this:
+    // this.<signal field> becomes the field's ref, and this.<dep>
+    // becomes the generated dep local (a service's signals track
+    // through the render tracker like the component's own). Anything
+    // else on this (a plain field, a method) cannot be tracked, so it
+    // is reported and the caller degrades the field.
+    const rewriteComputedInitializer = (init: string): { text?: string; badRef?: string } => {
+      let text = init;
+      const refNames = [...formFields.keys(), ...streamFields, ...signalFields.keys()];
+      for (const name of refNames) {
+        text = text.replace(new RegExp(`this\\.${name}\\b`, 'g'), `${name}Ref.current`);
+      }
+      for (const dep of component.constructorDeps ?? []) {
+        text = text.replace(new RegExp(`this\\.${dep.propertyName}\\b`, 'g'), dep.propertyName);
+      }
+      const bad = /\bthis\.([A-Za-z_$][\w$]*)/.exec(text);
+      if (bad) return { badRef: bad[1] };
+      return { text };
+    };
+
     // --- Reactive form instances (Stage 8) -----------------------------------
     // A FormGroup/FormControl field is one stable instance per component
     // instance, held in a ref with its initializer verbatim (the author's
@@ -3295,7 +3344,7 @@ class Generator {
     // profileForm.get('email').invalid stay live, the same notify shape
     // services use.
     const formLines: string[] = [];
-    if (formFields.size || streamFields.size) {
+    if (formFields.size || streamFields.size || signalFields.size) {
       this.reactImports.add('useRef');
       this.reactImports.add('useState');
       this.reactImports.add('useEffect');
@@ -3308,6 +3357,28 @@ class Generator {
           formLines.push(`  const ${field.name}Ref = useRef(${initText});`);
         } else if (streamFields.has(field.name) && field.initializer) {
           formLines.push(`  const ${field.name}Ref = useRef(${field.initializer});`);
+        } else if (signalFields.has(field.name) && field.initializer) {
+          // Signals adoption: the ref holds the one signal or computed
+          // instance; the runtime name joins the file's runtime import.
+          if (signalFields.get(field.name) === 'signal') {
+            this.usedRuntime.add('signal');
+            formLines.push(`  const ${field.name}Ref = useRef(${field.initializer});`);
+          } else {
+            const rewritten = rewriteComputedInitializer(field.initializer);
+            if (rewritten.text) {
+              this.usedRuntime.add('computed');
+              formLines.push(`  const ${field.name}Ref = useRef(${rewritten.text});`);
+            } else {
+              diagnostics.push(warning(
+                'GEN_SIGNAL_SCOPE',
+                `Field '${field.name}': the computed() initializer reads 'this.${rewritten.badRef}', which is not a signal or computed field or an injected service; a computed value can only track signals, so the field is declared as undefined in the generated component`,
+                undefined, undefined,
+                `Read only signal and computed fields (and signals on injected services) inside computed(); derive from a plain field with a method instead, which the template calls fresh on every render`,
+              ));
+              formLines.push(`  // TODO: computed field '${forLineComment(field.name)}' reads 'this.${forLineComment(rewritten.badRef ?? '')}', which a computed value cannot track; it is declared as undefined so this file still compiles.`);
+              formLines.push(`  const ${field.name}Ref = useRef(undefined);`);
+            }
+          }
         }
       }
       if (formFields.size) {
@@ -3381,7 +3452,7 @@ class Generator {
     for (const f of outputs) outputCallbacks.set(f.name, outputPropName(f.name));
     const { methods: translated, diagnostics: methodDiags } = translateMethods(component, 'react', stateFields, {
       outputCallbacks,
-      formFields: new Set([...formFields.keys(), ...streamFields]),
+      formFields: new Set([...formFields.keys(), ...streamFields, ...signalFields.keys()]),
     });
     diagnostics.push(...methodDiags);
     // A method named like a generated setter (set + a state field's
@@ -3433,10 +3504,36 @@ class Generator {
       };
       const { methods: ctorTranslated, diagnostics: ctorDiags } = translateMethods(ctorHost, 'react', stateFields, {
         outputCallbacks,
-        formFields: new Set([...formFields.keys(), ...streamFields]),
+        formFields: new Set([...formFields.keys(), ...streamFields, ...signalFields.keys()]),
       });
       diagnostics.push(...ctorDiags);
       ctorLines = ctorTranslated[0]?.lines ?? [];
+    }
+
+    // --- Signals: effect placement (signals adoption) -----------------------
+    // effect() calls in the constructor or ngOnInit are created inside
+    // an effect scope opened by the mount effect below, so the cleanup
+    // the scope returns destroys them on unmount. effect() anywhere
+    // else still runs, but nothing destroys it with the component;
+    // that earns one warning per method.
+    const EFFECT_CALL_RE = /\beffect\s*\(/;
+    const ngOnInitBody = component.methodDetails.find((m) => m.name === 'ngOnInit')?.body ?? '';
+    const lifecycleUsesEffect = EFFECT_CALL_RE.test(component.constructorBody ?? '') || EFFECT_CALL_RE.test(ngOnInitBody);
+    if (lifecycleUsesEffect || component.methodDetails.some((m) => m.body && EFFECT_CALL_RE.test(m.body))) {
+      this.usedRuntime.add('effect');
+    }
+    if (lifecycleUsesEffect) {
+      this.usedRuntime.add('beginEffectScope');
+      this.usedRuntime.add('endEffectScope');
+    }
+    for (const m of component.methodDetails) {
+      if (m.name === 'ngOnInit' || !m.body || !EFFECT_CALL_RE.test(m.body)) continue;
+      diagnostics.push(warning(
+        'GEN_SIGNAL_EFFECT_CONTEXT',
+        `Method '${m.name}' calls effect(); an effect created outside the constructor or ngOnInit is not destroyed when the component is destroyed`,
+        undefined, undefined,
+        'Move the effect() call into the constructor or ngOnInit; effects created there are destroyed with the component',
+      ));
     }
 
     // --- Lifecycle (M6): ngOnInit / ngOnDestroy -> useEffect ----------------
@@ -3447,11 +3544,22 @@ class Generator {
     if (hasInit || hasDestroy || ctorLines.length) {
       this.reactImports.add('useEffect');
       lifecycleLines.push('  useEffect(() => {');
+      if (lifecycleUsesEffect) lifecycleLines.push('    beginEffectScope();');
       for (const line of ctorLines) lifecycleLines.push(line ? `    ${line}` : line);
       if (hasInit) lifecycleLines.push('    ngOnInit();');
-      if (hasDestroy) {
+      if (lifecycleUsesEffect) lifecycleLines.push('    const __endEffects = endEffectScope();');
+      if (hasDestroy && lifecycleUsesEffect) {
+        lifecycleLines.push('    return () => {');
+        lifecycleLines.push('      __endEffects();');
+        lifecycleLines.push('      ngOnDestroy();');
+        lifecycleLines.push('    };');
+      } else if (hasDestroy) {
         lifecycleLines.push('    return () => {');
         lifecycleLines.push('      ngOnDestroy();');
+        lifecycleLines.push('    };');
+      } else if (lifecycleUsesEffect) {
+        lifecycleLines.push('    return () => {');
+        lifecycleLines.push('      __endEffects();');
         lifecycleLines.push('    };');
       }
       lifecycleLines.push('  }, []);');
@@ -3469,17 +3577,41 @@ class Generator {
     // cannot be returned bare, `{cond && (...)}` alone is not valid JSX,
     // so it is wrapped in a fragment. A single plain element root (the
     // common <screen> shape) is returned as-is, exactly as in Stage 2.
+    // --- Signals: the render tracker (signals adoption) ---------------------
+    // Every generated component carries a render tracker. begin() runs
+    // just before the returned view is evaluated and end() right after
+    // (the try/finally around the return below), so every signal the
+    // view reads, directly, through a method it calls, or through an
+    // injected service, subscribes exactly this component, and a write
+    // to any of them re-renders it. The tracker is disposed on unmount.
+    this.reactImports.add('useRef');
+    this.reactImports.add('useReducer');
+    this.reactImports.add('useEffect');
+    this.usedRuntime.add('SignalRenderTracker');
+    const signalLines: string[] = [
+      '  const [, __sigBump] = useReducer((n: number) => n + 1, 0);',
+      '  const __sigTracker = useRef(new SignalRenderTracker(__sigBump));',
+      '  useEffect(() => () => { __sigTracker.current.dispose(); }, []);',
+    ];
+
     const only = ast.children.length === 1 ? ast.children[0] : undefined;
     const bareRoot = !!only && (only.type === 'text' || !only.structural) && !(opts.entry && this.snackActive);
-    const returnLines = bareRoot
-      ? ['  return (', ...bodyLines, '  );']
-      : [
-          '  return (',
-          '    <>',
-          ...bodyLines.map((l) => (l ? `  ${l}` : l)),
-          '    </>',
-          '  );',
-        ];
+    const returnLines = [
+      '  __sigTracker.current.begin();',
+      '  try {',
+      ...(bareRoot
+        ? ['    return (', ...bodyLines.map((l) => (l ? `  ${l}` : l)), '    );']
+        : [
+            '    return (',
+            '      <>',
+            ...bodyLines.map((l) => (l ? `    ${l}` : l)),
+            '      </>',
+            '    );',
+          ]),
+      '  } finally {',
+      '    __sigTracker.current.end();',
+      '  }',
+    ];
 
     // --- Navigation state (Stage 9) ------------------------------------------
     // The entry component hosting the outlet mirrors the navigator's
@@ -3512,6 +3644,7 @@ class Generator {
       ...depLines,
       ...navLines,
       ...snackLines,
+      ...signalLines,
       ...fieldLines,
       ...formLines,
       ...modelLines,

@@ -5,11 +5,11 @@ import type { PickerMode } from '../../../ui/src/datetime';
 import { applyMask } from '../../../ui/src/mask';
 import { chartModel } from '../../../ui/src/chart';
 import { AVATAR_TONES, AVATAR_TONE_NAMES, COLOR_SWATCHES } from '../../../ui/src/palette';
-import { ActivatedRoute, FormArray, FormGroup, matchRoute, RouteMatch, ValidatorFn, Validators, validateValue } from '../../../runtime/src/index';
+import { ActivatedRoute, FormArray, FormGroup, matchRoute, RouteMatch, ValidatorFn, Validators, validateValue, signal as signalRuntime, computed as computedRuntime } from '../../../runtime/src/index';
 import { ComponentField, ComponentInfo, DirectiveInfo, PipeInfo, ServiceInfo } from '../class/parseComponent';
 import { DirectiveStyleAssign, directiveStyles } from '../class/parseDirective';
 import { ResolvedRoute } from '../class/parseRoutes';
-import { builderDepsOf, evaluateFormInitializer, isFormInitializer } from '../class/formInit';
+import { builderDepsOf, evaluateFormInitializer, isFormInitializer, signalKindOf } from '../class/formInit';
 import { ChildUnitInput, outputPropName, verbatimInitFields } from '../codegen/generate';
 import { translateMethods } from '../codegen/methods';
 import { nearestOnScale } from '../style/css';
@@ -114,6 +114,143 @@ function exprInitsOf(component: {
   return out;
 }
 
+/** The signal field initializers of a host, field name -> source text (signals adoption). */
+function signalInitsOf(host: { fields: ComponentField[] }): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const f of host.fields) {
+    if (f.initializer && signalKindOf(f.initializer) === 'signal') out[f.name] = f.initializer;
+  }
+  return out;
+}
+
+/**
+ * The body of a computed() initializer's arrow, rewritten as a method
+ * body (signals adoption): an expression body becomes a return
+ * statement. Undefined when the initializer is not a plain
+ * empty-parameter arrow, or when the body reads something a computed
+ * value cannot track through this: the same scope rule codegen
+ * applies with GEN_SIGNAL_SCOPE, only signal and computed fields and
+ * injected services may be read.
+ */
+function computedBodyOf(
+  host: { fields: ComponentField[]; constructorDeps?: { propertyName: string; typeName: string }[] },
+  field: ComponentField,
+): string | undefined {
+  const init = field.initializer!;
+  const m = /^\s*computed\s*(?:<[^>]*>)?\s*\(/.exec(init);
+  if (!m) return undefined;
+  const rest = init.slice(m[0].length);
+  const arrowAt = rest.indexOf('=>');
+  if (arrowAt < 0) return undefined;
+  if (!/^\s*\(\s*\)\s*$/.test(rest.slice(0, arrowAt))) return undefined;
+  const after = rest.slice(arrowAt + 2).trim();
+  let body: string;
+  if (after.startsWith('{')) {
+    let depth = 0;
+    let end = -1;
+    for (let i = 0; i < after.length; i++) {
+      if (after[i] === '{') depth++;
+      else if (after[i] === '}') {
+        depth--;
+        if (depth === 0) { end = i; break; }
+      }
+    }
+    if (end < 0) return undefined;
+    body = after.slice(0, end + 1);
+  } else {
+    if (!after.endsWith(')')) return undefined;
+    body = `{ return ${after.slice(0, -1).trim()}; }`;
+  }
+  const allowed = new Set<string>();
+  for (const f of host.fields) if (signalKindOf(f.initializer)) allowed.add(f.name);
+  for (const d of host.constructorDeps ?? []) allowed.add(d.propertyName);
+  for (const ref of body.matchAll(/\bthis\.([A-Za-z_$][\w$]*)/g)) {
+    if (!allowed.has(ref[1])) return undefined;
+  }
+  return body;
+}
+
+/**
+ * The computed fields of a host as page functions (signals adoption):
+ * each computed arrow is translated like a method body in state mode,
+ * so its this.<field> reads land on the instance state, where the
+ * page rebuilds the signal and computed instances themselves. Fields
+ * whose arrows fall outside the computed scope rule are skipped, so
+ * the preview degrades exactly where the generated app does.
+ */
+function signalFnsOf(
+  host: { fields: ComponentField[]; methods: string[]; methodDetails: ComponentInfo['methodDetails']; constructorDeps?: { propertyName: string; typeName: string }[] },
+  style: 'root' | 'def',
+): Record<string, string> {
+  const bodies = new Map<string, string>();
+  for (const f of host.fields) {
+    if (!f.initializer || signalKindOf(f.initializer) !== 'computed') continue;
+    const body = computedBodyOf(host, f);
+    if (body !== undefined) bodies.set(f.name, body);
+  }
+  if (!bodies.size) return {};
+  const synthetic = [...bodies.entries()].map(([name, body]) => ({
+    name: `__sig_${name}`,
+    params: [] as { name: string; text: string }[],
+    body,
+  }));
+  const synthHost = {
+    fields: host.fields,
+    methods: [...host.methods, ...synthetic.map((s) => s.name)],
+    methodDetails: synthetic,
+  };
+  const { methods } = translateMethods(synthHost as Parameters<typeof translateMethods>[0], 'state', new Set());
+  const out: Record<string, string> = {};
+  for (const m of methods) {
+    const fieldName = m.name.replace(/^__sig_/, '');
+    if (!bodies.has(fieldName)) continue;
+    if (style === 'root') {
+      out[fieldName] = `function () {\n${m.lines.join('\n')}\n  }`;
+    } else {
+      const body = m.lines.map((l) => (l ? `      ${l}` : l)).join('\n');
+      out[fieldName] = `function (state, methods, props) {\n${body}\n      }`;
+    }
+  }
+  return out;
+}
+
+/**
+ * Add the signal and computed instances of a host's fields to a
+ * preview state (signals adoption), as the real runtime objects, so
+ * the server paint reads the same values the page will. A signal's
+ * seed is evaluated from its argument list; a computed is built over
+ * its expression body with this.<field> reads rewritten to plain
+ * identifiers evaluated against a fresh copy of the state (block
+ * bodies and service-reading computeds stay for the page, whose
+ * translated functions run them in full).
+ */
+function addSignalInstances(
+  state: Record<string, unknown>,
+  host: { fields: ComponentField[]; constructorDeps?: { propertyName: string; typeName: string }[] },
+): void {
+  for (const f of host.fields) {
+    if (!f.initializer) continue;
+    const kind = signalKindOf(f.initializer);
+    if (kind === 'signal') {
+      const m = /^\s*signal\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)\s*$/.exec(f.initializer);
+      if (!m) continue;
+      const args = evaluateExprInitializer(`[${m[1]}]`);
+      if (args.ok && Array.isArray(args.value)) state[f.name] = signalRuntime(args.value[0]);
+    } else if (kind === 'computed') {
+      const body = computedBodyOf(host, f);
+      if (body === undefined) continue;
+      const ret = /^\{\s*return\s+([\s\S]*?);\s*\}$/.exec(body);
+      if (!ret) continue;
+      const exprSource = ret[1].replace(/\bthis\.([A-Za-z_$][\w$]*)/g, '$1');
+      state[f.name] = computedRuntime(() => {
+        const scope: Record<string, unknown> = {};
+        for (const k of Object.keys(state)) scope[k] = state[k];
+        return evaluateExpression(exprSource, scope);
+      });
+    }
+  }
+}
+
 /** The preview state: every field whose initializer is a literal structure. */
 export function componentState(component: ComponentInfo): Record<string, unknown> {
   const state: Record<string, unknown> = {};
@@ -124,6 +261,7 @@ export function componentState(component: ComponentInfo): Record<string, unknown
   }
   addFormInstances(state, component);
   addExprInstances(state, component);
+  addSignalInstances(state, component);
   return state;
 }
 
@@ -139,6 +277,7 @@ function stateWithInputs(host: { fields: ComponentField[]; constructorDeps?: { p
     if (v !== undefined) state[f.name] = v;
   }
   addFormInstances(state, host);
+  addSignalInstances(state, host);
   return state;
 }
 
@@ -1844,10 +1983,16 @@ export function previewScript(
   const serviceEntries: string[] = [];
   for (const svc of data.services ?? []) {
     if (!svc.providedInRoot) continue;
+    const svcSignalFns = signalFnsOf(svc, 'def');
+    const svcSignalFnEntries = Object.entries(svcSignalFns)
+      .map(([k, fn]) => `      ${jsonForScript(k)}: ${fn}`)
+      .join(',\n');
     serviceEntries.push(
       `  ${jsonForScript(svc.className)}: {\n` +
       `    "state": ${jsonForScript(stateWithInputs(svc))},\n` +
       `    "deps": ${jsonForScript(depsOf(svc.constructorDeps))},\n` +
+      `    "exprInits": ${jsonForScript({ ...exprInitsOf(svc), ...signalInitsOf(svc) })},\n` +
+      `    "signalFns": {\n${svcSignalFnEntries}\n    },\n` +
       `    "methods": {\n${defMethods(svc)}\n    }\n  }`,
     );
   }
@@ -1864,7 +2009,11 @@ export function previewScript(
     // Date would degrade to a string in JSON, so the page rebuilds
     // them from source with __evalExprInit.
     const childFormInits = formInitsOf(child.info);
-    const childExprInits = exprInitsOf(child.info);
+    const childExprInits = { ...exprInitsOf(child.info), ...signalInitsOf(child.info) };
+    const childSignalFns = signalFnsOf(child.info, 'def');
+    const childSignalFnEntries = Object.entries(childSignalFns)
+      .map(([k, fn]) => `      ${jsonForScript(k)}: ${fn}`)
+      .join(',\n');
     const childState = stateWithInputs(child.info);
     for (const k of Object.keys(childFormInits)) delete childState[k];
     componentEntries.push(
@@ -1873,6 +2022,7 @@ export function previewScript(
       `    "state": ${jsonForScript(childState)},\n` +
       `    "formInits": ${jsonForScript(childFormInits)},\n` +
       `    "exprInits": ${jsonForScript(childExprInits)},\n` +
+      `    "signalFns": {\n${childSignalFnEntries}\n    },\n` +
       `    "deps": ${jsonForScript(depsOf(child.info.constructorDeps))},\n` +
       `    "inputs": ${jsonForScript(child.info.fields.filter((f) => f.isInput).map((f) => f.name))},\n` +
       `    "outputs": ${jsonForScript(child.info.fields.filter((f) => f.isOutput).map((f) => f.name))},\n` +
@@ -1908,17 +2058,39 @@ export function previewScript(
   }));
   const rootDeps = depsOf(component.constructorDeps);
   const rootOnInit = component.methods.includes('ngOnInit') ? '"ngOnInit"' : 'null';
-  const needsWiring = Object.keys(rootDeps).length > 0 || rootOnInit !== 'null';
   const declaredTheme = declaredThemeOf(ast);
   // Root form instances: excluded from the serialized state (instances
   // do not survive JSON) and rebuilt in the page from FORM_INITS.
   // Verbatim-initializer fields (proof fix) are excluded the same way
   // and rebuilt from EXPR_INITS, so a Date stays a Date in the page.
   const rootFormInits = formInitsOf(component);
-  const rootExprInits = exprInitsOf(component);
+  const rootExprInits = { ...exprInitsOf(component), ...signalInitsOf(component) };
+  const rootSignalFns = signalFnsOf(component, 'root');
+  const rootSignalFnEntries = Object.entries(rootSignalFns)
+    .map(([k, fn]) => `  ${jsonForScript(k)}: ${fn}`)
+    .join(',\n');
   const serialState: Record<string, unknown> = { ...state };
   for (const k of Object.keys(rootFormInits)) delete serialState[k];
   for (const k of Object.keys(rootExprInits)) delete serialState[k];
+  for (const k of Object.keys(rootSignalFns)) delete serialState[k];
+
+  // Root wiring suffix: every piece of root state is built first
+  // (injected services, form instances, verbatim-initializer fields,
+  // signal and computed instances), then the page renders once with
+  // the real values, then ngOnInit runs and the page renders again.
+  // Building everything before the first render matters for signals:
+  // a template that calls a signal reads it during the render, so the
+  // instance must already exist; a plain field read of a missing
+  // value only prints empty, but a call on one throws.
+  const wiringParts: string[] = [];
+  if (Object.keys(rootDeps).length) wiringParts.push('Object.keys(ROOT_DEPS).forEach(function (k) { state[k] = __resolveDep(ROOT_DEPS[k]); });');
+  if (Object.keys(rootFormInits).length) wiringParts.push('Object.keys(FORM_INITS).forEach(function (k) { state[k] = __evalFormInit(FORM_INITS[k]); });');
+  if (Object.keys(rootExprInits).length) wiringParts.push('Object.keys(EXPR_INITS).forEach(function (k) { state[k] = __evalExprInit(EXPR_INITS[k]); });');
+  if (Object.keys(rootSignalFns).length) wiringParts.push('Object.keys(SIGNAL_FNS).forEach(function (k) { state[k] = computed(function () { return SIGNAL_FNS[k](); }); });');
+  const rootWiringSuffix = [
+    ...(wiringParts.length ? [`\n// Root wiring: build every piece of root state (services, forms, verbatim and signal fields), then render once with the real values.\n${wiringParts.join('\n')}\n__render();`] : []),
+    ...(rootOnInit !== 'null' ? [`\n${ROOT_ONINIT_WIRING}`] : []),
+  ].join('');
 
   return `// Rangular interactive preview runtime (Stage 2).
 // State and methods are live: (click) handlers mutate state and re-render.
@@ -1930,6 +2102,9 @@ const AVATAR_TONE_NAMES = ${jsonForScript(AVATAR_TONE_NAMES)};
 const state = ${jsonForScript(serialState)};
 const FORM_INITS = ${jsonForScript(rootFormInits)};
 const EXPR_INITS = ${jsonForScript(rootExprInits)};
+const SIGNAL_FNS = {
+${rootSignalFnEntries}
+};
 const methods = {
 ${methodEntries.join(',\n')}
 };
@@ -1950,8 +2125,13 @@ const ROUTES = ${jsonForScript((data.routes ?? []).map((r) => ({
   })))};
 const ROOT_DEPS = ${jsonForScript(rootDeps)};
 const ROOT_ONINIT = ${rootOnInit};
-${PAGE_RUNTIME}${needsWiring ? `\n${ROOT_WIRING}` : ''}${Object.keys(rootFormInits).length ? `\n${ROOT_FORM_WIRING}` : ''}${Object.keys(rootExprInits).length ? `\n${ROOT_EXPR_WIRING}` : ''}${needsWiring ? `\n${ROOT_ONINIT_WIRING}` : ''}
-${themeWiring(declaredTheme)}`;
+${PAGE_RUNTIME}${rootWiringSuffix}
+${themeWiring(declaredTheme)}
+// Boot render: the first full render runs only now, after the wiring
+// above has built every piece of state (services, forms, verbatim and
+// signal fields), so a template that calls a signal never reads it
+// before it exists.
+__render();`;
 }
 
 /**
@@ -1983,18 +2163,6 @@ function themeWiring(declared: 'light' | 'dark'): string {
   ].join('\n');
 }
 
-/**
- * Appended after the page runtime when the root component injects services
- * or has ngOnInit: the static first render happens without deps, then the
- * wiring epilogue assigns the singletons and runs ngOnInit once (the
- * preview analogue of the generated useEffect(..., [])).
- */
-const ROOT_WIRING = String.raw`
-// Root wiring (Stage 3): injected services land in state first.
-Object.keys(ROOT_DEPS).forEach(function (k) { state[k] = __resolveDep(ROOT_DEPS[k]); });
-__render();
-`;
-
 const ROOT_ONINIT_WIRING = String.raw`
 // Root ngOnInit (Stage 3): runs once after mount, with the injected
 // services, the form instances and the verbatim-initializer fields
@@ -2005,33 +2173,6 @@ if (ROOT_ONINIT && typeof methods[ROOT_ONINIT] === 'function') {
   methods[ROOT_ONINIT]();
   __render();
 }
-`;
-
-/**
- * Appended after the page runtime when the root component has reactive
- * form fields (Stage 8): the instances are built only once the runtime
- * (and its Validators table) exists, then the screen re-renders with
- * live form values.
- */
-const ROOT_FORM_WIRING = String.raw`
-// Root form instances (Stage 8): build the FormGroup/FormControl fields
-// from their initializers, then re-render with live values and validity.
-Object.keys(FORM_INITS).forEach(function (k) { state[k] = __evalFormInit(FORM_INITS[k]); });
-__render();
-`;
-
-/**
- * Appended after the page runtime when the root component has
- * verbatim-initializer fields (proof fix): the values the generated
- * app computes by running the initializer (a Date, a timestamp) are
- * rebuilt here from the same source, then the screen re-renders.
- */
-const ROOT_EXPR_WIRING = String.raw`
-// Root verbatim-initializer fields (proof fix): rebuild the values
-// codegen emits verbatim (new Date(), Date.now(), literal expressions)
-// from their initializers, then re-render with the real values.
-Object.keys(EXPR_INITS).forEach(function (k) { state[k] = __evalExprInit(EXPR_INITS[k]); });
-__render();
 `;
 
 /**
@@ -3873,6 +4014,127 @@ function __evalFormInit(src) {
     return undefined;
   }
 }
+// --- Signals mirror (signals adoption) --------------------------------
+// Generated apps use the runtime package's reactive core; the page
+// carries this plain-JS mirror of it: callable signals, computed
+// values (lazy, cached, glitch-free through producer versions) and
+// effects with automatic dependency tracking, the same semantics as
+// the runtime, parity-tested against it. One simplification: effects
+// re-run synchronously when a dependency changes instead of through
+// a microtask queue, which keeps the preview deterministic; a
+// cascade guard stops an effect that keeps writing its own
+// dependency. The preview needs no render tracker: every interaction
+// ends in a full re-render, so signal reads in templates simply see
+// the current values.
+var __sigActive = null;
+var __sigComputedDepth = 0;
+var __sigEffectCascade = 0;
+function __sigTrack(producer) {
+  if (!__sigActive) return;
+  __sigActive.producers.set(producer, producer.version);
+  producer.consumers.add(__sigActive);
+}
+function __sigDetach(consumer) {
+  consumer.producers.forEach(function (version, producer) { producer.consumers.delete(consumer); });
+  consumer.producers.clear();
+}
+function __sigNotify(producer) {
+  var cs = Array.from(producer.consumers);
+  for (var i = 0; i < cs.length; i++) cs[i].onProducerChanged();
+}
+function signal(initial) {
+  var node = { version: 0, consumers: new Set(), value: initial };
+  var read = function () { __sigTrack(node); return node.value; };
+  read.set = function (v) {
+    if (__sigComputedDepth > 0) throw new Error('Writing to a signal is not allowed inside a computed value; move the write into a method or an effect.');
+    if (Object.is(node.value, v)) return;
+    node.value = v;
+    node.version++;
+    __sigNotify(node);
+  };
+  read.update = function (fn) { read.set(fn(node.value)); };
+  var ro = null;
+  read.asReadonly = function () {
+    if (!ro) ro = function () { __sigTrack(node); return node.value; };
+    return ro;
+  };
+  return read;
+}
+function __sigComputed(fn) {
+  var node = {
+    version: 0, consumers: new Set(), producers: new Map(),
+    value: undefined, hasValue: false, stale: true, isComputed: true,
+    onProducerChanged: function () {
+      if (node.stale) return;
+      node.stale = true;
+      __sigNotify(node);
+    },
+    refreshIfStale: function () { if (node.stale) __sigRefreshComputed(node, fn); },
+  };
+  return node;
+}
+function __sigRefreshComputed(node, fn) {
+  if (node.hasValue) {
+    var changed = false;
+    node.producers.forEach(function (seen, producer) {
+      if (changed) return;
+      if (producer.isComputed) producer.refreshIfStale();
+      if (producer.version !== seen) changed = true;
+    });
+    if (!changed) { node.stale = false; return; }
+  }
+  __sigDetach(node);
+  var prev = __sigActive;
+  __sigActive = node;
+  __sigComputedDepth++;
+  var next;
+  try { next = fn(); } finally { __sigComputedDepth--; __sigActive = prev; }
+  var valueChanged = !node.hasValue || !Object.is(node.value, next);
+  node.value = next;
+  node.hasValue = true;
+  node.stale = false;
+  if (valueChanged) node.version++;
+}
+function computed(fn) {
+  var node = __sigComputed(fn);
+  return function () {
+    if (node.stale || !node.hasValue) __sigRefreshComputed(node, fn);
+    __sigTrack(node);
+    return node.value;
+  };
+}
+function __sigRunEffect(node) {
+  if (node.destroyed) return;
+  if (__sigEffectCascade > 100) { console.warn('preview: effect cascade stopped (an effect keeps writing its own dependency)'); return; }
+  __sigEffectCascade++;
+  try {
+    var cs = node.cleanups; node.cleanups = [];
+    for (var i = 0; i < cs.length; i++) cs[i]();
+    __sigDetach(node);
+    var prev = __sigActive;
+    __sigActive = node;
+    try { node.fn(function (cb) { node.cleanups.push(cb); }); } finally { __sigActive = prev; }
+  } finally { __sigEffectCascade--; }
+}
+function effect(fn) {
+  var node = {
+    producers: new Map(), cleanups: [], destroyed: false, fn: fn,
+    onProducerChanged: function () { __sigRunEffect(node); },
+  };
+  __sigRunEffect(node);
+  return { destroy: function () {
+    if (node.destroyed) return;
+    node.destroyed = true;
+    var cs = node.cleanups; node.cleanups = [];
+    for (var i = 0; i < cs.length; i++) cs[i]();
+    __sigDetach(node);
+  } };
+}
+function untracked(fn) {
+  var prev = __sigActive;
+  __sigActive = null;
+  try { return fn(); } finally { __sigActive = prev; }
+}
 function __evalExprInit(src) {
   // Verbatim field initializers (proof fix): the page rebuilds the
   // fields codegen declares by emitting the initializer verbatim.
@@ -3892,6 +4154,12 @@ function __evalExprInit(src) {
       return new (Date.bind.apply(Date, [null].concat(args)))();
     }
     if (/^Date\.now\s*\(\s*\)$/.test(s)) return Date.now();
+    var gm = /^signal\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)$/.exec(s);
+    if (gm) {
+      var gargs = gm[1].replace(/^\s+|\s+$/g, '');
+      var gvals = gargs ? __eval(__parse('[' + gargs + ']'), {}) : [];
+      return signal(gvals[0]);
+    }
     var sm = /^new\s+(Subject|BehaviorSubject|ReplaySubject|AsyncSubject)\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)$/.exec(s);
     if (sm) {
       var sargs = sm[2].replace(/^\s+|\s+$/g, '');
@@ -6497,6 +6765,8 @@ function __service(name) {
   Object.keys(def.deps).forEach(function (k) { st[k] = __resolveDep(def.deps[k]); });
   inst.methods = __bind(def, inst);
   Object.keys(inst.methods).forEach(function (m) { st[m] = inst.methods[m]; });
+  Object.keys(def.exprInits || {}).forEach(function (k) { st[k] = __evalExprInit(def.exprInits[k]); });
+  Object.keys(def.signalFns || {}).forEach(function (k) { st[k] = computed(function () { return def.signalFns[k](st, inst.methods, inst.props); }); });
   return st;
 }
 function __childInstance(path, def, props) {
@@ -6509,6 +6779,7 @@ function __childInstance(path, def, props) {
     Object.keys(def.formInits || {}).forEach(function (k) { st[k] = __evalFormInit(def.formInits[k]); });
     Object.keys(def.exprInits || {}).forEach(function (k) { st[k] = __evalExprInit(def.exprInits[k]); });
     inst.methods = __bind(def, inst);
+    Object.keys(def.signalFns || {}).forEach(function (k) { st[k] = computed(function () { return def.signalFns[k](st, inst.methods, inst.props); }); });
     __instances[path] = inst;
   }
   inst.props = props;
@@ -6703,5 +6974,4 @@ function __render() {
   __rendering = false;
   if (__asyncDirty) { __asyncDirty = false; __render(); }
 }
-__render();
 `;

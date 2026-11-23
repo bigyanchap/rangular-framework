@@ -27,18 +27,13 @@ test('EventEmitter off removes a specific listener', () => {
   assert.deepEqual(b, ['x']);
 });
 
-test('signal get/set/subscribe with change notification', () => {
+test('signal: callable read, set and update (signals adoption)', () => {
   const s = signal(0);
-  const seen: number[] = [];
-  const unsub = s.subscribe((v) => seen.push(v));
+  assert.equal(s(), 0);
   s.set(1);
-  s.set(1); // no change -> no notification
+  s.set(1); // no change -> no version bump
   s.update((v) => v + 1);
-  unsub();
-  s.set(99);
-  assert.equal(s.get(), 99);
-  assert.equal(s.value, 99);
-  assert.deepEqual(seen, [1, 2]);
+  assert.equal(s(), 2);
 });
 
 test('Container register/get and missing token error', () => {
