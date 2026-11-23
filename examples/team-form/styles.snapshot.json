@@ -24,6 +24,9 @@
           "borderRadius": 16,
           "padding": 16
         },
+        "icon": {
+          "color": "#1f1f1f"
+        },
         "input": {
           "background": "#ffffff",
           "borderColor": "#747775",
@@ -45,7 +48,22 @@
           "color": "#1f1f1f"
         }
       },
-      "styles": {}
+      "styles": {
+        "member-del": {
+          "width": 48,
+          "height": 48,
+          "marginTop": 16,
+          "alignItems": "center",
+          "justifyContent": "center"
+        },
+        "member-field": {
+          "flex": 1
+        },
+        "member-row": {
+          "flexDirection": "row",
+          "gap": 8
+        }
+      }
     },
     "dark": {
       "roles": {
@@ -70,6 +88,9 @@
           "borderRadius": 16,
           "padding": 16
         },
+        "icon": {
+          "color": "#e3e3e3"
+        },
         "input": {
           "background": "#1e1f20",
           "borderColor": "#8e918f",
@@ -91,7 +112,22 @@
           "color": "#e3e3e3"
         }
       },
-      "styles": {}
+      "styles": {
+        "member-del": {
+          "width": 48,
+          "height": 48,
+          "marginTop": 16,
+          "alignItems": "center",
+          "justifyContent": "center"
+        },
+        "member-field": {
+          "flex": 1
+        },
+        "member-row": {
+          "flexDirection": "row",
+          "gap": 8
+        }
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
 # Recipe: Team form, dynamic rows with FormArray
 
-**Intent**: A reactive form with a list of rows the user can grow and shrink: a `FormArray` of member name controls inside a `FormGroup`, one input per row, an Add member button that pushes a new control, and a Remove button per row.
+**Intent**: A reactive form with a list of rows the user can grow and shrink: a `FormArray` of member name controls inside a `FormGroup`, one input per row, an Add member button that pushes a new control, and a red delete icon at the right of each row's textbox, centred on the textbox, that removes the row.
 
 **Source**
 
@@ -13,6 +13,11 @@ import { FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
 @Component({
   selector: 'app-team-form',
   templateUrl: './team-form.component.html',
+  styles: [`
+    .member-row { flex-direction: row; gap: 8px; }
+    .member-field { flex: 1; }
+    .member-del { width: 48px; height: 48px; margin-top: 16px; align-items: center; justify-content: center; }
+  `],
 })
 export class TeamFormComponent {
   teamForm = new FormGroup({
@@ -49,9 +54,15 @@ export class TeamFormComponent {
       <p *ngIf="teamForm.get('team').invalid && teamForm.get('team').touched">Team name is required.</p>
       <div formArrayName="members">
         <div *ngFor="let m of teamForm.get('members').controls; let i = index">
-          <input label="Member" placeholder="Member name" [formControlName]="i">
+          <section class="member-row">
+            <section class="member-field">
+              <input label="Member" placeholder="Member name" [formControlName]="i">
+            </section>
+            <section class="member-del" (click)="removeMember(i)">
+              <icon name="delete" color="error" size="28"></icon>
+            </section>
+          </section>
           <p *ngIf="teamForm.get('members').at(i).invalid && teamForm.get('members').at(i).touched">Member name is required.</p>
-          <button (click)="removeMember(i)">Remove</button>
         </div>
       </div>
       <button (click)="addMember()">Add member</button>
@@ -71,6 +82,9 @@ Key lines of the generated `team-form.component.tsx`:
 (teamFormRef.current.get('members')).removeAt(i);
 {teamFormRef.current.get('members').controls.map((m, i) => (
   <RgInput label="Member" placeholder="Member name" value={teamFormRef.current.get('members').at(i).value} onChangeText={($event) => teamFormRef.current.get('members').at(i).setValue($event)} onBlur={() => { teamFormRef.current.get('members').at(i).markAsTouched?.(); setFormVersion((v) => v + 1); }} />
+  <RgSection onPress={() => removeMember(i)} style={styles.memberDel}>
+    <RgIcon name="delete" size={28} color="error" />
+  </RgSection>
 ))}
 ```
 
@@ -79,6 +93,7 @@ The array is a child of the group like any other control: the group holds it in 
 **Rules used**
 
 - **`formArrayName` scopes the rows.** It is a static attribute on a container inside the `[formGroup]` form, naming a control of the group that must be a `FormArray`. A name that is not a control of the group, or a control that is not an array, is a `GEN_FORM_ARRAY` error, as is `formArrayName` outside a `[formGroup]` form.
+- **The delete icon sits in its own centred square.** Each row is a row section: the field section flexes to fill the width, and a 48 square at its right holds the delete icon centred both ways. The square is dropped 16px from the row top so its centre lands on the textbox's centre, below the field's label. A tap on the square calls `removeMember(i)`.
 - **Row inputs bind the index.** Inside a `formArrayName` container, `[formControlName]="i"` is the one place the binding form is allowed: it binds the row at that index, usually the `*ngFor` loop variable. A static number (`formControlName="0"`) also works for a fixed row. A static name inside the container is a `GEN_FORM_ARRAY` error, because rows are numbered, not named.
 - **Reach the array with `.get()`.** `teamForm.get('members')` returns the array; cast it in methods (`as FormArray`) to call `push`, `insert`, `removeAt`, `clear`, `at` and `length`. Class getters are not part of the subset, so do not hide the array behind a `get members()` accessor.
 - **The loop source is the controls list.** `*ngFor` over `teamForm.get('members').controls` with `let i = index` is the row pattern; the loop variable itself is only a placeholder, the input binds by index.

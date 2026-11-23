@@ -553,6 +553,12 @@ function hasClass(el: ShimElement, name: string): boolean {
 
 const inputsOf = (app: ShimElement) => findAll(app, (e) => e.tagName === 'INPUT');
 const buttonOf = (app: ShimElement, text: string) => findAll(app, (e) => hasClass(e, 'btn') && e.textContent.includes(text))[0];
+// A row's delete control is a centred icon square (a section holding
+// only an icon), not a text button: the stack section that carries an
+// icon and no input.
+const deleteRowOf = (app: ShimElement) => findAll(app, (e) => hasClass(e, 'stack')
+  && findAll(e, (x) => hasClass(x, 'icon')).length > 0
+  && findAll(e, (x) => x.tagName === 'INPUT').length === 0)[0];
 
 function typeInto(app: ShimElement, index: number, value: string): void {
   const input = inputsOf(app)[index];
@@ -592,7 +598,7 @@ test('team-form preview behaviour: add and remove rows, typing writes rows, subm
   );
 
   // Remove the first member row: the saved shape follows on re-save.
-  buttonOf(app, 'Remove').click();
+  deleteRowOf(app).click();
   assert.equal(inputsOf(app).length, 3);
   buttonOf(app, 'Save team').click();
   assert.ok(

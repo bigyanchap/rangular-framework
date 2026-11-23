@@ -4,6 +4,11 @@ import { FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
 @Component({
   selector: 'app-team-form',
   templateUrl: './team-form.component.html',
+  styles: [`
+    .member-row { flex-direction: row; gap: 8px; }
+    .member-field { flex: 1; }
+    .member-del { width: 48px; height: 48px; margin-top: 16px; align-items: center; justify-content: center; }
+  `],
 })
 export class TeamFormComponent {
   teamForm = new FormGroup({
