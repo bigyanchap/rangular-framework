@@ -362,6 +362,9 @@ const AVATAR_TONE_NAMES = {"blue":{"bg":"#e8f0fe","fg":"#0b57d0"},"purple":{"bg"
 const state = {"pct":30,"tab":0,"navOpen":false};
 const FORM_INITS = {};
 const EXPR_INITS = {};
+const SIGNAL_FNS = {
+
+};
 const methods = {
   openNav: function () {
 state.navOpen = true;
@@ -2226,6 +2229,127 @@ function __evalFormInit(src) {
     return undefined;
   }
 }
+// --- Signals mirror (signals adoption) --------------------------------
+// Generated apps use the runtime package's reactive core; the page
+// carries this plain-JS mirror of it: callable signals, computed
+// values (lazy, cached, glitch-free through producer versions) and
+// effects with automatic dependency tracking, the same semantics as
+// the runtime, parity-tested against it. One simplification: effects
+// re-run synchronously when a dependency changes instead of through
+// a microtask queue, which keeps the preview deterministic; a
+// cascade guard stops an effect that keeps writing its own
+// dependency. The preview needs no render tracker: every interaction
+// ends in a full re-render, so signal reads in templates simply see
+// the current values.
+var __sigActive = null;
+var __sigComputedDepth = 0;
+var __sigEffectCascade = 0;
+function __sigTrack(producer) {
+  if (!__sigActive) return;
+  __sigActive.producers.set(producer, producer.version);
+  producer.consumers.add(__sigActive);
+}
+function __sigDetach(consumer) {
+  consumer.producers.forEach(function (version, producer) { producer.consumers.delete(consumer); });
+  consumer.producers.clear();
+}
+function __sigNotify(producer) {
+  var cs = Array.from(producer.consumers);
+  for (var i = 0; i < cs.length; i++) cs[i].onProducerChanged();
+}
+function signal(initial) {
+  var node = { version: 0, consumers: new Set(), value: initial };
+  var read = function () { __sigTrack(node); return node.value; };
+  read.set = function (v) {
+    if (__sigComputedDepth > 0) throw new Error('Writing to a signal is not allowed inside a computed value; move the write into a method or an effect.');
+    if (Object.is(node.value, v)) return;
+    node.value = v;
+    node.version++;
+    __sigNotify(node);
+  };
+  read.update = function (fn) { read.set(fn(node.value)); };
+  var ro = null;
+  read.asReadonly = function () {
+    if (!ro) ro = function () { __sigTrack(node); return node.value; };
+    return ro;
+  };
+  return read;
+}
+function __sigComputed(fn) {
+  var node = {
+    version: 0, consumers: new Set(), producers: new Map(),
+    value: undefined, hasValue: false, stale: true, isComputed: true,
+    onProducerChanged: function () {
+      if (node.stale) return;
+      node.stale = true;
+      __sigNotify(node);
+    },
+    refreshIfStale: function () { if (node.stale) __sigRefreshComputed(node, fn); },
+  };
+  return node;
+}
+function __sigRefreshComputed(node, fn) {
+  if (node.hasValue) {
+    var changed = false;
+    node.producers.forEach(function (seen, producer) {
+      if (changed) return;
+      if (producer.isComputed) producer.refreshIfStale();
+      if (producer.version !== seen) changed = true;
+    });
+    if (!changed) { node.stale = false; return; }
+  }
+  __sigDetach(node);
+  var prev = __sigActive;
+  __sigActive = node;
+  __sigComputedDepth++;
+  var next;
+  try { next = fn(); } finally { __sigComputedDepth--; __sigActive = prev; }
+  var valueChanged = !node.hasValue || !Object.is(node.value, next);
+  node.value = next;
+  node.hasValue = true;
+  node.stale = false;
+  if (valueChanged) node.version++;
+}
+function computed(fn) {
+  var node = __sigComputed(fn);
+  return function () {
+    if (node.stale || !node.hasValue) __sigRefreshComputed(node, fn);
+    __sigTrack(node);
+    return node.value;
+  };
+}
+function __sigRunEffect(node) {
+  if (node.destroyed) return;
+  if (__sigEffectCascade > 100) { console.warn('preview: effect cascade stopped (an effect keeps writing its own dependency)'); return; }
+  __sigEffectCascade++;
+  try {
+    var cs = node.cleanups; node.cleanups = [];
+    for (var i = 0; i < cs.length; i++) cs[i]();
+    __sigDetach(node);
+    var prev = __sigActive;
+    __sigActive = node;
+    try { node.fn(function (cb) { node.cleanups.push(cb); }); } finally { __sigActive = prev; }
+  } finally { __sigEffectCascade--; }
+}
+function effect(fn) {
+  var node = {
+    producers: new Map(), cleanups: [], destroyed: false, fn: fn,
+    onProducerChanged: function () { __sigRunEffect(node); },
+  };
+  __sigRunEffect(node);
+  return { destroy: function () {
+    if (node.destroyed) return;
+    node.destroyed = true;
+    var cs = node.cleanups; node.cleanups = [];
+    for (var i = 0; i < cs.length; i++) cs[i]();
+    __sigDetach(node);
+  } };
+}
+function untracked(fn) {
+  var prev = __sigActive;
+  __sigActive = null;
+  try { return fn(); } finally { __sigActive = prev; }
+}
 function __evalExprInit(src) {
   // Verbatim field initializers (proof fix): the page rebuilds the
   // fields codegen declares by emitting the initializer verbatim.
@@ -2245,6 +2369,12 @@ function __evalExprInit(src) {
       return new (Date.bind.apply(Date, [null].concat(args)))();
     }
     if (/^Date\.now\s*\(\s*\)$/.test(s)) return Date.now();
+    var gm = /^signal\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)$/.exec(s);
+    if (gm) {
+      var gargs = gm[1].replace(/^\s+|\s+$/g, '');
+      var gvals = gargs ? __eval(__parse('[' + gargs + ']'), {}) : [];
+      return signal(gvals[0]);
+    }
     var sm = /^new\s+(Subject|BehaviorSubject|ReplaySubject|AsyncSubject)\s*(?:<[^>]*>)?\s*\(([\s\S]*)\)$/.exec(s);
     if (sm) {
       var sargs = sm[2].replace(/^\s+|\s+$/g, '');
@@ -4850,6 +4980,8 @@ function __service(name) {
   Object.keys(def.deps).forEach(function (k) { st[k] = __resolveDep(def.deps[k]); });
   inst.methods = __bind(def, inst);
   Object.keys(inst.methods).forEach(function (m) { st[m] = inst.methods[m]; });
+  Object.keys(def.exprInits || {}).forEach(function (k) { st[k] = __evalExprInit(def.exprInits[k]); });
+  Object.keys(def.signalFns || {}).forEach(function (k) { st[k] = computed(function () { return def.signalFns[k](st, inst.methods, inst.props); }); });
   return st;
 }
 function __childInstance(path, def, props) {
@@ -4862,6 +4994,7 @@ function __childInstance(path, def, props) {
     Object.keys(def.formInits || {}).forEach(function (k) { st[k] = __evalFormInit(def.formInits[k]); });
     Object.keys(def.exprInits || {}).forEach(function (k) { st[k] = __evalExprInit(def.exprInits[k]); });
     inst.methods = __bind(def, inst);
+    Object.keys(def.signalFns || {}).forEach(function (k) { st[k] = computed(function () { return def.signalFns[k](st, inst.methods, inst.props); }); });
     __instances[path] = inst;
   }
   inst.props = props;
@@ -5056,7 +5189,6 @@ function __render() {
   __rendering = false;
   if (__asyncDirty) { __asyncDirty = false; __render(); }
 }
-__render();
 
 // Preview theme toggle (Stage 4): flips data-theme on <html>; the CSS
 // variables in <style> do the rest. Guarded so non-DOM harnesses and
@@ -5076,6 +5208,11 @@ if (__themeBtn) {
   });
   __syncThemeBtn();
 }
+// Boot render: the first full render runs only now, after the wiring
+// above has built every piece of state (services, forms, verbatim and
+// signal fields), so a template that calls a signal never reads it
+// before it exists.
+__render();
 </script>
 </body>
 </html>
