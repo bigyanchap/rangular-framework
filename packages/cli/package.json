@@ -7,9 +7,10 @@
   "license": "Apache-2.0",
   "main": "dist/cli/src/cli.js",
   "name": "@rangular-framework/cli",
-  "version": "0.6.6",
+  "version": "0.6.7",
   "dependencies": {
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "rxjs": "^7.8.2"
   },
   "files": [
     "dist"

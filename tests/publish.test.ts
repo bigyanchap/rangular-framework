@@ -30,6 +30,13 @@ function installCli(): { cliJs: string; work: string } {
     path.join(tmp, 'lib', 'node_modules', 'typescript'),
     'dir',
   );
+  // Same for rxjs: the runtime code the CLI bundles imports it, so
+  // the CLI declares it and an install hoists it the same way.
+  fs.symlinkSync(
+    path.join(ROOT, 'node_modules', 'rxjs'),
+    path.join(tmp, 'lib', 'node_modules', 'rxjs'),
+    'dir',
+  );
   const work = path.join(tmp, 'work');
   fs.mkdirSync(work, { recursive: true });
   return { cliJs: path.join(pkgDir, 'dist', 'cli', 'src', 'cli.js'), work };

@@ -69,6 +69,20 @@ export function isFormInitializer(initializer: string | undefined, builderDeps?:
   return !!m && !!builderDeps && builderDeps.has(m[1]);
 }
 
+const STREAM_NEW_RE = /^\s*new\s+(Subject|BehaviorSubject|ReplaySubject|AsyncSubject)\s*(<[^>]*>)?\s*\(/;
+
+/**
+ * True when a field initializer constructs an RxJS subject (RxJS
+ * adoption). Like a form field, a subject field is one stable
+ * instance for the component's whole life: codegen holds it in a
+ * ref, because a subject recreated per render would orphan every
+ * subscriber of the previous instance.
+ */
+export function isStreamInitializer(initializer: string | undefined): boolean {
+  if (!initializer) return false;
+  return STREAM_NEW_RE.test(initializer);
+}
+
 /** The FormBuilder constructor dep names of a host component or service. */
 export function builderDepsOf(host: { constructorDeps?: { propertyName: string; typeName: string }[] }): Set<string> {
   return new Set((host.constructorDeps ?? [])

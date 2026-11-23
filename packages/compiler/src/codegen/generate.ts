@@ -4,7 +4,7 @@ import { CHART_TYPES } from '../../../ui/src/chart';
 import { CarriedImportBinding, ComponentInfo, DirectiveInfo, PipeInfo, ServiceInfo } from '../class/parseComponent';
 import { DirectiveStyleAssign, directiveStyles } from '../class/parseDirective';
 import { ResolvedRoute } from '../class/parseRoutes';
-import { analyzeFormInitializer, builderDepsOf, FormFieldInfo, isFormInitializer, rewriteBuilderInitializer } from '../class/formInit';
+import { analyzeFormInitializer, builderDepsOf, FormFieldInfo, isFormInitializer, isStreamInitializer, rewriteBuilderInitializer } from '../class/formInit';
 import { Diagnostic, error, warning } from '../diagnostics';
 import { nearestOnScale, ParsedCss } from '../style/css';
 import { ElementNode, EventBinding, TemplateNode, TemplateRoot } from '../template/ast';
@@ -1421,6 +1421,18 @@ class Generator {
       }
     }
 
+    // Stream fields (RxJS adoption): a field initialised with
+    // new Subject(...) (or BehaviorSubject, ReplaySubject or
+    // AsyncSubject, imported from 'rxjs') is one stable instance
+    // like a form field. It is held in a ref below, never state and
+    // never a per-render const, or every render would replace the
+    // subject and orphan its subscribers.
+    const streamFields = new Set<string>();
+    for (const field of component.fields) {
+      if (field.isInput || field.isOutput) continue;
+      if (isStreamInitializer(field.initializer)) streamFields.add(field.name);
+    }
+
     // ngModel belongs on <input> only in this version, and a two-way
     // ngModel field becomes state by definition (Angular semantics: the
     // binding itself writes the field).
@@ -1451,6 +1463,7 @@ class Generator {
     for (const field of component.fields) {
       if (field.isInput || field.isOutput) continue;
       if (formFields.has(field.name)) continue;
+      if (streamFields.has(field.name)) continue;
       if (field.initializer && isLiteralInitializer(field.initializer)
         && (mutated.has(field.name) || ngModelStateFields.has(field.name))) {
         stateFields.add(field.name);
@@ -1757,6 +1770,7 @@ class Generator {
     // generated model object (email.invalid -> emailModel.invalid).
     const identRenames = new Map<string, string>();
     for (const name of formFields.keys()) identRenames.set(name, `${name}Ref.current`);
+    for (const name of streamFields) identRenames.set(name, `${name}Ref.current`);
     const refBases = new Map<string, string>();
     for (const info of modelInfos) {
       if (info.refName) refBases.set(info.refName, `${info.key}Model`);
@@ -3256,6 +3270,7 @@ class Generator {
     for (const field of component.fields) {
       if (field.isInput || field.isOutput) continue;
       if (formFields.has(field.name)) continue; // Stage 8: a ref below, not state.
+      if (streamFields.has(field.name)) continue; // RxJS adoption: a ref below, not a per-render const.
       if (field.initializer && isLiteralInitializer(field.initializer)) {
         if (stateFields.has(field.name)) {
           fieldLines.push(`  const [${field.name}, ${setterName(field.name)}] = useState(${field.initializer});`);
@@ -3280,41 +3295,46 @@ class Generator {
     // profileForm.get('email').invalid stay live, the same notify shape
     // services use.
     const formLines: string[] = [];
-    if (formFields.size) {
+    if (formFields.size || streamFields.size) {
       this.reactImports.add('useRef');
       this.reactImports.add('useState');
       this.reactImports.add('useEffect');
       for (const field of component.fields) {
         const info = formFields.get(field.name);
-        if (!info) continue;
-        const initText = info.builderDep && field.initializer
-          ? rewriteBuilderInitializer(field.initializer, info.builderDep)
-          : field.initializer;
-        formLines.push(`  const ${field.name}Ref = useRef(${initText});`);
-      }
-      const formTexts: string[] = [];
-      for (const field of component.fields) {
-        if (formFields.has(field.name) && field.initializer) formTexts.push(field.initializer);
-      }
-      for (const m of component.methodDetails) if (m.body) formTexts.push(m.body);
-      for (const name of ['FormGroup', 'FormControl', 'FormArray', 'FormBuilder', 'Validators']) {
-        if (formTexts.some((t) => new RegExp(`\\b${name}\\b`).test(t))) this.usedRuntime.add(name);
-      }
-      formLines.push('  const [, setFormVersion] = useState(0);');
-      formLines.push('  useEffect(() => {');
-      formLines.push('    const subs = [');
-      for (const field of component.fields) {
-        const info = formFields.get(field.name);
-        if (!info) continue;
-        if (info.kind === 'group') {
-          formLines.push(`      ...Object.values(${field.name}Ref.current.controls).map((control) => control.valueChanges.subscribe(() => setFormVersion((v) => v + 1))),`);
-        } else {
-          formLines.push(`      ${field.name}Ref.current.valueChanges.subscribe(() => setFormVersion((v) => v + 1)),`);
+        if (info) {
+          const initText = info.builderDep && field.initializer
+            ? rewriteBuilderInitializer(field.initializer, info.builderDep)
+            : field.initializer;
+          formLines.push(`  const ${field.name}Ref = useRef(${initText});`);
+        } else if (streamFields.has(field.name) && field.initializer) {
+          formLines.push(`  const ${field.name}Ref = useRef(${field.initializer});`);
         }
       }
-      formLines.push('    ];');
-      formLines.push('    return () => { subs.forEach((sub) => sub.unsubscribe()); };');
-      formLines.push('  }, []);');
+      if (formFields.size) {
+        const formTexts: string[] = [];
+        for (const field of component.fields) {
+          if (formFields.has(field.name) && field.initializer) formTexts.push(field.initializer);
+        }
+        for (const m of component.methodDetails) if (m.body) formTexts.push(m.body);
+        for (const name of ['FormGroup', 'FormControl', 'FormArray', 'FormBuilder', 'Validators']) {
+          if (formTexts.some((t) => new RegExp(`\\b${name}\\b`).test(t))) this.usedRuntime.add(name);
+        }
+        formLines.push('  const [, setFormVersion] = useState(0);');
+        formLines.push('  useEffect(() => {');
+        formLines.push('    const subs = [');
+        for (const field of component.fields) {
+          const info = formFields.get(field.name);
+          if (!info) continue;
+          if (info.kind === 'group') {
+            formLines.push(`      ...Object.values(${field.name}Ref.current.controls).map((control) => control.valueChanges.subscribe(() => setFormVersion((v) => v + 1))),`);
+          } else {
+            formLines.push(`      ${field.name}Ref.current.valueChanges.subscribe(() => setFormVersion((v) => v + 1)),`);
+          }
+        }
+        formLines.push('    ];');
+        formLines.push('    return () => { subs.forEach((sub) => sub.unsubscribe()); };');
+        formLines.push('  }, []);');
+      }
     }
 
     // --- Template-driven validation models (Stage 8) -------------------------
@@ -3361,7 +3381,7 @@ class Generator {
     for (const f of outputs) outputCallbacks.set(f.name, outputPropName(f.name));
     const { methods: translated, diagnostics: methodDiags } = translateMethods(component, 'react', stateFields, {
       outputCallbacks,
-      formFields: new Set(formFields.keys()),
+      formFields: new Set([...formFields.keys(), ...streamFields]),
     });
     diagnostics.push(...methodDiags);
     // A method named like a generated setter (set + a state field's
@@ -3413,7 +3433,7 @@ class Generator {
       };
       const { methods: ctorTranslated, diagnostics: ctorDiags } = translateMethods(ctorHost, 'react', stateFields, {
         outputCallbacks,
-        formFields: new Set(formFields.keys()),
+        formFields: new Set([...formFields.keys(), ...streamFields]),
       });
       diagnostics.push(...ctorDiags);
       ctorLines = ctorTranslated[0]?.lines ?? [];
