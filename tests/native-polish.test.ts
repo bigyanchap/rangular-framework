@@ -236,6 +236,20 @@ test('a refreshing list lends its pull to the screen that owns the gesture', () 
   assert.ok(screenFn.includes('Math.abs(y - scrollYRef.current) >= 1'), 'the veil state only moves on a real scroll change');
 });
 
+test('a paging list lends its end-reached to the screen that owns the scroll', () => {
+  const listFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('export function RgList'),
+    primitivesSrc.indexOf('export function RgRowAction'));
+  assert.ok(listFn.includes('registerEndReached'), 'the list registers its end-reached contract');
+  assert.ok(listFn.includes('registerEndReached({ onScroll: lentEndScroll })'), 'the registered entry carries the guarded end handler');
+  assert.ok(listFn.includes('scrollControl?.registerEndReached'), 'the list lends only when a screen is there to lend to');
+  const screenFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('export function RgScreen'),
+    primitivesSrc.indexOf('export function RgAppbar'));
+  assert.ok(screenFn.includes('listEndReachedRef'), 'the screen holds the registered end-reached');
+  assert.ok(screenFn.includes('listEndReachedRef.current?.onScroll?.(e)'), 'the screen scroll runs the lent handler');
+});
+
 test('calendar cells hold one fixed height, so the selected row never sits lower', () => {
   assert.ok(
     primitivesSrc.includes("calendarCell: { width: '14.2857%', height: 44, alignItems: 'center', justifyContent: 'center' }"),
