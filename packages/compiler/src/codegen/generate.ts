@@ -3131,7 +3131,7 @@ class Generator {
         // bare, a numeric or string condition leaks its falsy
         // value (0 or '') into the tree as a child, and React
         // Native throws "Text strings must be rendered within a
-        // <Text> component" for it (lesson 86's rating demo,
+        // <Text> component" for it (lesson 88's rating demo,
         // his phone 2026-11-21: *ngIf="score" with score 0).
         return [
           `${indent}{!!(${codeExpr(parts.condition)}) && (`,
