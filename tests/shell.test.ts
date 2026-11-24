@@ -263,7 +263,12 @@ test('a three-digit avatar number stands whole in the preview', () => {
 test('the keyboard contract lives in the shipped screen and fields', () => {
   assert.ok(primitivesSrc.includes('KeyboardAvoidingView'), 'the screen avoids the keyboard');
   assert.ok(primitivesSrc.includes('keyboardShouldPersistTaps'), 'taps persist while the keyboard is up');
-  assert.ok(!primitivesSrc.includes('InputAccessoryView'), 'fields carry no keyboard accessory (removed at his word, 2026-11-19)');
+  const rgInputStart = primitivesSrc.indexOf('export function RgInput');
+  const rgInputBody = primitivesSrc.slice(rgInputStart, primitivesSrc.indexOf('export function', rgInputStart + 10));
+  assert.ok(!rgInputBody.includes('InputAccessoryView'), 'fields carry no keyboard accessory (removed at his word, 2026-11-19)');
+  const rgOtpStart = primitivesSrc.indexOf('export function RgOtp');
+  const rgOtpBody = primitivesSrc.slice(rgOtpStart, primitivesSrc.indexOf('export function', rgOtpStart + 10));
+  assert.ok(rgOtpBody.includes('InputAccessoryView'), 'the OTP number pad carries the check accessory (his order, 2026-11-24: a number pad has no return key to dismiss with)');
   assert.ok(primitivesSrc.includes('keyboardWillShow'), 'the screen learns the keyboard frame from the keyboard events');
   assert.ok(primitivesSrc.includes('RgOverlayLiftContext'), 'fields inside overlays report to the overlay lift control');
   assert.ok(primitivesSrc.includes('translateY: -overlayLift'), 'the overlay layer translates by exactly the focused field overlap');

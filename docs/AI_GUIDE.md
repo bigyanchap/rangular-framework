@@ -1464,7 +1464,12 @@ shell beside it and the behaviour fixes under both.
   input accessory: an iOS Done accessory added in the Gmail
   light round was removed at Bigyan's word on 2026-11-19,
   because the stock keyboard's own return key already
-  dismisses. The browser preview has no software keyboard and
+  dismisses. One scoped exception, at his word on 2026-11-24:
+  the OTP control's number pad has no return key, so its hidden
+  field carries an iOS accessory holding a check disc that
+  dismisses the keyboard, and the OTP reports its field to the
+  same lift, so the boxes rest above the keyboard like any
+  field. The browser preview has no software keyboard and
   draws none of this; that is the stated grain, the behaviour
   is native-only.
 - Route scroll: in a routed app the generated root keys the

@@ -359,6 +359,16 @@ test('row avatar: a numeric avatarText stands whole, words cut to initials', () 
   assert.ok(rowSrc.includes('avatarLabel.length > 2 ? 11'), 'a three character label takes the smaller size');
 });
 
+test('otp: the hidden field joins the keyboard lift; the number pad carries a check accessory', () => {
+  const otpStart = primitivesSrc.indexOf('export function RgOtp');
+  const otpSrc = primitivesSrc.slice(otpStart, otpStart + 4200);
+  assert.ok(otpSrc.includes('useKeyboardLift'), 'the OTP takes the shared lift hook');
+  assert.ok(otpSrc.includes('liftAboveKeyboard(inputRef.current)'), 'the hidden field reports its node on focus, so the screen lifts the boxes above the keyboard');
+  assert.ok(otpSrc.includes('InputAccessoryView'), 'the iOS accessory renders above the number pad');
+  assert.ok(otpSrc.includes('Keyboard.dismiss'), 'the check disc dismisses the keyboard');
+  assert.ok(otpSrc.includes('otpCheck'), 'the accessory carries the check disc');
+});
+
 test('calendar: the shown month follows an outside value change; the title opens the jump wheels', () => {
   const calStart = primitivesSrc.indexOf('export function RgCalendar');
   const calSrc = primitivesSrc.slice(calStart, calStart + 7000);
