@@ -277,6 +277,9 @@
   .timeline-time { font-size: 12px; color: var(--text-muted); }
   .calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .calendar-title { font-size: 20px; font-weight: 600; color: var(--text); }
+  .calendar-title-pill { display: inline-flex; align-items: center; gap: 4px; background: var(--role-primary-container); border: none; border-radius: 9999px; padding: 4px 12px; cursor: pointer; font-family: inherit; }
+  .calendar-jump-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .calendar-check { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
   .calendar-week { display: flex; }
   .calendar-week-cell { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); padding: 4px 0; }
   .calendar-grid { display: flex; flex-wrap: wrap; }
@@ -357,11 +360,11 @@
 <span class="label">Your people</span>
 <div class="avatar-group"><span class="avatar-ring"><span class="avatar-face" style="width:40px;height:40px;font-size:16px">EW</span></span><span class="avatar-ring overlap"><span class="avatar-face" style="width:40px;height:40px;font-size:16px">AC</span></span><span class="avatar-ring overlap"><span class="avatar-face" style="width:40px;height:40px;font-size:16px">MS</span></span><span class="avatar-ring overlap"><span class="avatar-overflow">+2</span></span></div>
 <span class="label">Sessions this week</span>
-<div class="chart"><svg width="320" height="178" viewBox="0 0 320 178"><rect x="16" y="61.47" width="48" height="98.53" fill="#0b57d0"/><text x="40" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Mon</text><rect x="96" y="4" width="48" height="156" fill="#1e8e3e"/><text x="120" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Tue</text><rect x="176" y="86.11" width="48" height="73.89" fill="#f9ab00"/><text x="200" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Wed</text><rect x="256" y="36.84" width="48" height="123.16" fill="#d93025"/><text x="280" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Thu</text></svg></div>
+<div class="chart"><svg width="320" height="178" viewBox="0 0 320 178"><path d="M 16 160 L 16 67.47 Q 16 61.47 22 61.47 L 58 61.47 Q 64 61.47 64 67.47 L 64 160 Z" fill="#79a3e5" stroke="#0b57d0" stroke-width="1"/><path d="M 16 160 L 16 67.47 Q 16 61.47 22 61.47 L 58 61.47 Q 64 61.47 64 67.47 L 64 105.81 L 16 105.81 Z" fill="#bbd0f2"/><text x="40" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Mon</text><path d="M 96 160 L 96 10 Q 96 4 102 4 L 138 4 Q 144 4 144 10 L 144 160 Z" fill="#83c195" stroke="#1e8e3e" stroke-width="1"/><path d="M 96 160 L 96 10 Q 96 4 102 4 L 138 4 Q 144 4 144 10 L 144 74.2 L 96 74.2 Z" fill="#c0dfc9"/><text x="120" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Tue</text><path d="M 176 160 L 176 92.11 Q 176 86.11 182 86.11 L 218 86.11 Q 224 86.11 224 92.11 L 224 160 Z" fill="#fcd173" stroke="#f9ab00" stroke-width="1"/><path d="M 176 160 L 176 92.11 Q 176 86.11 182 86.11 L 218 86.11 Q 224 86.11 224 92.11 L 224 119.36 L 176 119.36 Z" fill="#fde7b8"/><text x="200" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Wed</text><path d="M 256 160 L 256 42.84 Q 256 36.84 262 36.84 L 298 36.84 Q 304 36.84 304 42.84 L 304 160 Z" fill="#ea8d87" stroke="#d93025" stroke-width="1"/><path d="M 256 160 L 256 42.84 Q 256 36.84 262 36.84 L 298 36.84 Q 304 36.84 304 42.84 L 304 92.26 L 256 92.26 Z" fill="#f4c5c2"/><text x="280" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">Thu</text></svg></div>
 <div class="chart"><svg width="320" height="178" viewBox="0 0 320 178"><path d="M 0 156 L 106.67 64.8 L 213.33 95.2 L 320 4" fill="none" stroke="#0b57d0" stroke-width="2"/><circle cx="0" cy="156" r="3" fill="#0b57d0"/><circle cx="106.67" cy="64.8" r="3" fill="#0b57d0"/><circle cx="213.33" cy="95.2" r="3" fill="#0b57d0"/><circle cx="320" cy="4" r="3" fill="#0b57d0"/><text x="0" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">W1</text><text x="106.67" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">W2</text><text x="213.33" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">W3</text><text x="320" y="174" fill="var(--role-text-muted)" font-size="12" text-anchor="middle">W4</text></svg></div>
 <div class="chart"><svg width="320" height="220" viewBox="0 0 320 220"><path d="M 160 80 L 160 0 A 80 80 0 0 1 160 160 Z" fill="#0b57d0"/><path d="M 160 80 L 160 160 A 80 80 0 0 1 83.92 55.28 Z" fill="#1e8e3e"/><path d="M 160 80 L 83.92 55.28 A 80 80 0 0 1 160 0 Z" fill="#f9ab00"/><rect x="0" y="166" width="10" height="10" fill="#0b57d0"/><text x="16" y="176" fill="var(--role-text-muted)" font-size="12">Reading 50</text><rect x="0" y="184" width="10" height="10" fill="#1e8e3e"/><text x="16" y="194" fill="var(--role-text-muted)" font-size="12">Study 30</text><rect x="0" y="202" width="10" height="10" fill="#f9ab00"/><text x="16" y="212" fill="var(--role-text-muted)" font-size="12">Rest 20</text></svg></div>
 <span class="label">Pick a day</span>
-<div class="calendar"><div class="calendar-head"><span class="icon-btn"><span class="icon" style="color: var(--role-text)"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.15 11.98L14.58 16.4Q14.8 16.62 14.79 16.93T14.55 17.45Q14.33 17.68 14.01 17.68T13.48 17.45L8.53 12.5Q8.4 12.38 8.35 12.25T8.3 11.98Q8.3 11.83 8.35 11.7T8.53 11.45L13.5 6.48Q13.73 6.25 14.04 6.25T14.58 6.48Q14.8 6.7 14.8 7.01T14.58 7.55L10.15 11.98Z"/></svg></span></span><span class="calendar-title">Nov 2026</span><span class="icon-btn"><span class="icon" style="color: var(--role-text)"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.25 11.98L8.83 7.55Q8.6 7.33 8.61 7.03T8.85 6.5Q9.08 6.28 9.39 6.28T9.93 6.5L14.88 11.45Q15 11.58 15.05 11.7T15.1 11.98Q15.1 12.12 15.05 12.25T14.88 12.5L9.9 17.48Q9.68 17.7 9.38 17.69T8.85 17.45Q8.62 17.23 8.62 16.91T8.85 16.38L13.25 11.98Z"/></svg></span></span></div><div class="calendar-week"><span class="calendar-week-cell">Su</span><span class="calendar-week-cell">Mo</span><span class="calendar-week-cell">Tu</span><span class="calendar-week-cell">We</span><span class="calendar-week-cell">Th</span><span class="calendar-week-cell">Fr</span><span class="calendar-week-cell">Sa</span></div><div class="calendar-grid"><span class="calendar-cell"><span class="calendar-day">1</span></span><span class="calendar-cell"><span class="calendar-day">2</span></span><span class="calendar-cell"><span class="calendar-day">3</span></span><span class="calendar-cell"><span class="calendar-day">4</span></span><span class="calendar-cell"><span class="calendar-day">5</span></span><span class="calendar-cell"><span class="calendar-day">6</span></span><span class="calendar-cell"><span class="calendar-day">7</span></span><span class="calendar-cell"><span class="calendar-day">8</span></span><span class="calendar-cell"><span class="calendar-day">9</span></span><span class="calendar-cell"><span class="calendar-day">10</span></span><span class="calendar-cell"><span class="calendar-day">11</span></span><span class="calendar-cell"><span class="calendar-day">12</span></span><span class="calendar-cell"><span class="calendar-day selected">13</span></span><span class="calendar-cell"><span class="calendar-day">14</span></span><span class="calendar-cell"><span class="calendar-day">15</span></span><span class="calendar-cell"><span class="calendar-day">16</span></span><span class="calendar-cell"><span class="calendar-day">17</span></span><span class="calendar-cell"><span class="calendar-day">18</span></span><span class="calendar-cell"><span class="calendar-day">19</span></span><span class="calendar-cell"><span class="calendar-day">20</span></span><span class="calendar-cell"><span class="calendar-day">21</span></span><span class="calendar-cell"><span class="calendar-day">22</span></span><span class="calendar-cell"><span class="calendar-day">23</span></span><span class="calendar-cell"><span class="calendar-day today">24</span></span><span class="calendar-cell"><span class="calendar-day">25</span></span><span class="calendar-cell"><span class="calendar-day">26</span></span><span class="calendar-cell"><span class="calendar-day">27</span></span><span class="calendar-cell"><span class="calendar-day">28</span></span><span class="calendar-cell"><span class="calendar-day">29</span></span><span class="calendar-cell"><span class="calendar-day">30</span></span></div></div>
+<div class="calendar"><div class="calendar-head"><span class="icon-btn"><span class="icon" style="color: var(--role-text)"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M10.15 11.98L14.58 16.4Q14.8 16.62 14.79 16.93T14.55 17.45Q14.33 17.68 14.01 17.68T13.48 17.45L8.53 12.5Q8.4 12.38 8.35 12.25T8.3 11.98Q8.3 11.83 8.35 11.7T8.53 11.45L13.5 6.48Q13.73 6.25 14.04 6.25T14.58 6.48Q14.8 6.7 14.8 7.01T14.58 7.55L10.15 11.98Z"/></svg></span></span><span class="calendar-title calendar-title-pill">Nov 2026 <span class="icon" style="color: var(--role-primary)"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11.73 15.05Q11.6 15 11.48 14.88L6.53 9.93Q6.3 9.7 6.31 9.39T6.55 8.85Q6.78 8.62 7.09 8.62T7.62 8.85L12 13.25L16.4 8.85Q16.62 8.62 16.93 8.64T17.45 8.88Q17.68 9.1 17.68 9.41T17.45 9.95L12.53 14.88Q12.4 15 12.28 15.05T12 15.1Q11.85 15.1 11.73 15.05Z"/></svg></span></span><span class="icon-btn"><span class="icon" style="color: var(--role-text)"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13.25 11.98L8.83 7.55Q8.6 7.33 8.61 7.03T8.85 6.5Q9.08 6.28 9.39 6.28T9.93 6.5L14.88 11.45Q15 11.58 15.05 11.7T15.1 11.98Q15.1 12.12 15.05 12.25T14.88 12.5L9.9 17.48Q9.68 17.7 9.38 17.69T8.85 17.45Q8.62 17.23 8.62 16.91T8.85 16.38L13.25 11.98Z"/></svg></span></span></div><div class="calendar-week"><span class="calendar-week-cell">Su</span><span class="calendar-week-cell">Mo</span><span class="calendar-week-cell">Tu</span><span class="calendar-week-cell">We</span><span class="calendar-week-cell">Th</span><span class="calendar-week-cell">Fr</span><span class="calendar-week-cell">Sa</span></div><div class="calendar-grid"><span class="calendar-cell"><span class="calendar-day">1</span></span><span class="calendar-cell"><span class="calendar-day">2</span></span><span class="calendar-cell"><span class="calendar-day">3</span></span><span class="calendar-cell"><span class="calendar-day">4</span></span><span class="calendar-cell"><span class="calendar-day">5</span></span><span class="calendar-cell"><span class="calendar-day">6</span></span><span class="calendar-cell"><span class="calendar-day">7</span></span><span class="calendar-cell"><span class="calendar-day">8</span></span><span class="calendar-cell"><span class="calendar-day">9</span></span><span class="calendar-cell"><span class="calendar-day">10</span></span><span class="calendar-cell"><span class="calendar-day">11</span></span><span class="calendar-cell"><span class="calendar-day">12</span></span><span class="calendar-cell"><span class="calendar-day selected">13</span></span><span class="calendar-cell"><span class="calendar-day">14</span></span><span class="calendar-cell"><span class="calendar-day">15</span></span><span class="calendar-cell"><span class="calendar-day">16</span></span><span class="calendar-cell"><span class="calendar-day">17</span></span><span class="calendar-cell"><span class="calendar-day">18</span></span><span class="calendar-cell"><span class="calendar-day">19</span></span><span class="calendar-cell"><span class="calendar-day">20</span></span><span class="calendar-cell"><span class="calendar-day">21</span></span><span class="calendar-cell"><span class="calendar-day">22</span></span><span class="calendar-cell"><span class="calendar-day">23</span></span><span class="calendar-cell"><span class="calendar-day today">24</span></span><span class="calendar-cell"><span class="calendar-day">25</span></span><span class="calendar-cell"><span class="calendar-day">26</span></span><span class="calendar-cell"><span class="calendar-day">27</span></span><span class="calendar-cell"><span class="calendar-day">28</span></span><span class="calendar-cell"><span class="calendar-day">29</span></span><span class="calendar-cell"><span class="calendar-day">30</span></span></div></div>
 <p class="body">Selected: 2026-11-13T00:00:00</p>
 <span class="label">Journey</span>
 <div class="timeline"><div class="timeline-item"><div class="timeline-rail"><span class="timeline-dot"></span><span class="timeline-line"></span></div><div class="timeline-body"><div class="timeline-head"><span class="timeline-title">Started</span><span class="timeline-time">Mon</span></div><p class="body">The week began with a sunrise session.</p></div></div><div class="timeline-item"><div class="timeline-rail"><span class="timeline-dot"></span><span class="timeline-line"></span></div><div class="timeline-body"><div class="timeline-head"><span class="timeline-title">Deep work</span><span class="timeline-time">Wed</span></div><p class="body">Two long sittings, notes below.</p></div></div><div class="timeline-item"><div class="timeline-rail"><span class="timeline-dot"></span></div><div class="timeline-body"><div class="timeline-head"><span class="timeline-title">Review</span><span class="timeline-time">Today</span></div><p class="body">Looking back over the week.</p></div></div></div>
@@ -1242,6 +1245,15 @@ function __chartColor(point, index, palette) {
   var c = palette[index % Math.max(palette.length, 1)];
   return c === undefined || c === null ? '#000000' : c;
 }
+function __mixHex(hex, other, frac) {
+  var m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  var o = /^#([0-9a-fA-F]{6})$/.exec(other);
+  if (!m || !o) return hex;
+  var a = parseInt(m[1], 16);
+  var b = parseInt(o[1], 16);
+  var ch = function (shift) { return Math.round(((a >> shift) & 255) * (1 - frac) + ((b >> shift) & 255) * frac); };
+  return '#' + ((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1);
+}
 function __chartModel(type, data, width, height, palette, labelColor) {
   var points = __normalizeChartData(data);
   var w = Math.max(40, Math.floor(width) || 40);
@@ -1313,7 +1325,16 @@ function __chartModel(type, data, width, height, palette, labelColor) {
   points.forEach(function (p, i) {
     var v = Math.max(0, p.value);
     var h = v / barMax * (plotH - 4);
-    shapes.push({ kind: 'rect', x: __r2(slot * i + slot * 0.2), y: __r2(plotH - h), width: __r2(barW), height: __r2(h), fill: __chartColor(p, i, palette) });
+    var x = slot * i + slot * 0.2;
+    var y = plotH - h;
+    var colour = __chartColor(p, i, palette);
+    if (h > 0) {
+      var r = Math.min(6, barW / 2, h / 2);
+      var top = 'M ' + __r2(x) + ' ' + __r2(y + h) + ' L ' + __r2(x) + ' ' + __r2(y + r) + ' Q ' + __r2(x) + ' ' + __r2(y) + ' ' + __r2(x + r) + ' ' + __r2(y) + ' L ' + __r2(x + barW - r) + ' ' + __r2(y) + ' Q ' + __r2(x + barW) + ' ' + __r2(y) + ' ' + __r2(x + barW) + ' ' + __r2(y + r);
+      shapes.push({ kind: 'path', d: top + ' L ' + __r2(x + barW) + ' ' + __r2(y + h) + ' Z', fill: __mixHex(colour, '#ffffff', 0.45), stroke: colour, strokeWidth: 1 });
+      var gh = Math.max(0, h * 0.45);
+      if (gh > 1) shapes.push({ kind: 'path', d: top + ' L ' + __r2(x + barW) + ' ' + __r2(y + gh) + ' L ' + __r2(x) + ' ' + __r2(y + gh) + ' Z', fill: __mixHex(colour, '#ffffff', 0.72) });
+    }
     shapes.push({ kind: 'text', x: __r2(slot * i + slot / 2), y: plotH + 14, text: p.label, fill: labelColor, size: 12, anchor: 'middle' });
   });
   return { width: w, height: plotH + 18, shapes: shapes };
@@ -3438,9 +3459,25 @@ function __buildTimeline(el, scope, path, form) {
 function __buildCalendar(el, scope, path) {
   var wrap = document.createElement('div');
   wrap.className = 'calendar';
-  var selected = __parseParts(__controlValue(el, 'value', scope));
+  var rawValue = __controlValue(el, 'value', scope);
+  var selected = __parseParts(rawValue);
   var today = __nowParts();
-  var shown = __calendarStates[path] || (selected ? { year: selected.year, month: selected.month } : { year: today.year, month: today.month });
+  var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var st = __calendarStates[path];
+  if (!st) {
+    var seed = selected || today;
+    st = { year: seed.year, month: seed.month, lastValue: rawValue, jumping: false, dYear: seed.year, dMonth: seed.month };
+    __calendarStates[path] = st;
+  } else if (st.lastValue !== rawValue) {
+    // The shown month follows an outside value change, as the
+    // app's calendar does (2026-11-24).
+    st.lastValue = rawValue;
+    if (selected && (selected.year !== st.year || selected.month !== st.month)) {
+      st.year = selected.year;
+      st.month = selected.month;
+    }
+  }
+  var shown = st;
   var head = document.createElement('div');
   head.className = 'calendar-head';
   var prev = document.createElement('button');
@@ -3449,26 +3486,79 @@ function __buildCalendar(el, scope, path) {
   prev.appendChild(__icon('chevron-left', 24, 'text'));
   prev.addEventListener('click', function () {
     var total = shown.year * 12 + (shown.month - 1) - 1;
-    __calendarStates[path] = { year: Math.floor(total / 12), month: (total % 12) + 1 };
+    shown.year = Math.floor(total / 12);
+    shown.month = (total % 12) + 1;
     __render();
   });
   head.appendChild(prev);
-  var titleSpan = document.createElement('span');
-  titleSpan.className = 'calendar-title';
-  var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  titleSpan.textContent = monthNames[shown.month - 1] + ' ' + shown.year;
-  head.appendChild(titleSpan);
+  var titleBtn = document.createElement('button');
+  titleBtn.type = 'button';
+  titleBtn.className = 'calendar-title calendar-title-pill calendar-title-btn';
+  titleBtn.textContent = monthNames[shown.month - 1] + ' ' + shown.year;
+  titleBtn.appendChild(__icon('chevron-down', 16, 'primary'));
+  titleBtn.addEventListener('click', function () {
+    if (shown.jumping) {
+      shown.jumping = false;
+    } else {
+      shown.dYear = shown.year;
+      shown.dMonth = shown.month;
+      shown.jumping = true;
+    }
+    __render();
+  });
+  head.appendChild(titleBtn);
   var next = document.createElement('button');
   next.type = 'button';
   next.className = 'icon-btn calendar-next';
   next.appendChild(__icon('chevron-right', 24, 'text'));
   next.addEventListener('click', function () {
     var total = shown.year * 12 + (shown.month - 1) + 1;
-    __calendarStates[path] = { year: Math.floor(total / 12), month: (total % 12) + 1 };
+    shown.year = Math.floor(total / 12);
+    shown.month = (total % 12) + 1;
     __render();
   });
   head.appendChild(next);
   wrap.appendChild(head);
+  if (shown.jumping) {
+    var wheels = document.createElement('div');
+    wheels.className = 'wheels';
+    var mkWheel = function (values, current, pick) {
+      var col = document.createElement('div');
+      col.className = 'wheel';
+      values.forEach(function (v) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wheel-value' + (v.value === current ? ' selected' : '');
+        b.textContent = v.label;
+        b.addEventListener('click', function () { pick(v.value); __render(); });
+        col.appendChild(b);
+      });
+      return col;
+    };
+    var years = [];
+    var yStart = Math.min(today.year - 150, shown.dYear);
+    var yEnd = Math.max(today.year + 150, shown.dYear);
+    for (var y = yStart; y <= yEnd; y++) years.push({ value: y, label: '' + y });
+    wheels.appendChild(mkWheel(years, shown.dYear, function (v) { shown.dYear = v; }));
+    var months = monthNames.map(function (label, i) { return { value: i + 1, label: label }; });
+    wheels.appendChild(mkWheel(months, shown.dMonth, function (v) { shown.dMonth = v; }));
+    wrap.appendChild(wheels);
+    var jrow = document.createElement('div');
+    jrow.className = 'calendar-jump-row';
+    var chk = document.createElement('button');
+    chk.type = 'button';
+    chk.className = 'calendar-check';
+    chk.appendChild(__icon('check', 20, 'onPrimary'));
+    chk.addEventListener('click', function () {
+      shown.year = shown.dYear;
+      shown.month = shown.dMonth;
+      shown.jumping = false;
+      __render();
+    });
+    jrow.appendChild(chk);
+    wrap.appendChild(jrow);
+    return wrap;
+  }
   var week = document.createElement('div');
   week.className = 'calendar-week';
   ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(function (d) {
@@ -4780,7 +4870,8 @@ function __buildCore(el, scope, path, form) {
         var avl = document.createElement('span');
         avl.className = 'avatar-lg';
         var avText = __attr(el, 'avatarText', scope);
-        avl.textContent = avText ? String(avText).slice(0, 2) : (title ? String(title) : '•').charAt(0);
+        avl.textContent = avText ? (/^\d+$/.test(String(avText)) ? String(avText) : String(avText).slice(0, 2)) : (title ? String(title) : '•').charAt(0);
+        if (avl.textContent.length > 2) avl.style.fontSize = '11px';
         var avTone = __attr(el, 'avatarTone', scope) || el.attrs['avatarTone'];
         if (avTone === 'varied') {
           var avLabel = avl.textContent;
