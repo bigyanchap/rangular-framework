@@ -1480,6 +1480,15 @@ shell beside it and the behaviour fixes under both.
   dependency of apps on @rangular-framework/ui and the scaffold writes
   it. The preview answers with navigator.vibrate where the
   browser offers it.
+- List and screen `haptic`: an opt-in attribute on a list
+  or a screen with (endReached). With it, every firing of
+  the end-reached handler answers with the same light
+  selection haptic: on the list, the handler lent to the
+  screen, the list's own scroller and the FlatList path all
+  run one invoker that ticks first; on the screen, its own
+  guarded end handler ticks the same way. Without it the
+  scroller is silent. The preview answers with
+  navigator.vibrate where the browser offers it.
 - The icon set is 30: `code` joins, the angle brackets mark of
   the tutorial's drawer header.
 - Worked example: examples/gmail-shell, one screen proving the

@@ -6122,7 +6122,7 @@ function __buildCore(el, scope, path, form) {
         endBtn.type = 'button';
         endBtn.className = 'end-cue';
         endBtn.textContent = 'Load more (preview: tap)';
-        endBtn.addEventListener('click', function () { __runEvent(el, scope, 'endReached', undefined); });
+        endBtn.addEventListener('click', function () { if (el.booleanAttrs.indexOf('haptic') >= 0 && navigator.vibrate) navigator.vibrate(8); __runEvent(el, scope, 'endReached', undefined); });
         cueBottom.appendChild(endBtn);
         scrOut.push(cueBottom);
       }
@@ -6518,7 +6518,7 @@ function __buildCore(el, scope, path, form) {
         lEndBtn.type = 'button';
         lEndBtn.className = 'end-cue';
         lEndBtn.textContent = 'Load more (preview: tap)';
-        lEndBtn.addEventListener('click', function () { __runEvent(el, scope, 'endReached', undefined); });
+        lEndBtn.addEventListener('click', function () { if (el.booleanAttrs.indexOf('haptic') >= 0 && navigator.vibrate) navigator.vibrate(8); __runEvent(el, scope, 'endReached', undefined); });
         lCueBottom.appendChild(lEndBtn);
         lstOut.push(lCueBottom);
       }

@@ -250,6 +250,21 @@ test('a paging list lends its end-reached to the screen that owns the scroll', (
   assert.ok(screenFn.includes('listEndReachedRef.current?.onScroll?.(e)'), 'the screen scroll runs the lent handler');
 });
 
+test('a paging list with the haptic attribute answers an end-reached with a selection haptic', () => {
+  const listFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('export function RgList'),
+    primitivesSrc.indexOf('export function RgRowAction'));
+  assert.ok(listFn.includes('onEndReached, haptic }'), 'the list reads the haptic attribute');
+  assert.ok(listFn.includes('if (haptic) fireSelectionHaptic();'), 'the end invoker ticks the haptic first');
+  assert.ok(listFn.includes('endReachedScrollHandler(fireEndReached)'), 'the guarded end paths run the ticking invoker');
+  assert.ok(listFn.includes('onEndReached={onEndReached ? fireEndReached : undefined}'), 'the FlatList path runs the same invoker');
+  const screenFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('export function RgScreen'),
+    primitivesSrc.indexOf('export function RgAppbar'));
+  assert.ok(screenFn.includes('onEndReached, haptic, fade'), 'the screen reads the haptic attribute');
+  assert.ok(screenFn.includes('if (haptic) fireSelectionHaptic();'), 'the screen end handler ticks the haptic first');
+});
+
 test('calendar cells hold one fixed height, so the selected row never sits lower', () => {
   assert.ok(
     primitivesSrc.includes("calendarCell: { width: '14.2857%', height: 44, alignItems: 'center', justifyContent: 'center' }"),

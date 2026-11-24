@@ -137,6 +137,7 @@ Props are parsed from `packages/ui/src/primitives.tsx`; the primitives are shipp
 - `refreshing`: any
 - `onRefresh`: any
 - `onEndReached`: any
+- `haptic`: any
 - `fade`: any
 - `scrollKey`: any
 
@@ -281,6 +282,7 @@ Props are parsed from `packages/ui/src/primitives.tsx`; the primitives are shipp
 - `refreshing`: any
 - `onRefresh`: any
 - `onEndReached`: any
+- `haptic`: any
 
 ### RgRowAction
 

@@ -531,6 +531,10 @@
           "type": "any"
         },
         {
+          "name": "haptic",
+          "type": "any"
+        },
+        {
           "name": "fade",
           "type": "any"
         },
@@ -999,6 +1003,10 @@
         },
         {
           "name": "onEndReached",
+          "type": "any"
+        },
+        {
+          "name": "haptic",
           "type": "any"
         }
       ]

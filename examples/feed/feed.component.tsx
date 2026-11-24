@@ -45,7 +45,7 @@ export default function Feed() {
   __sigTracker.current.begin();
   try {
     return (
-      <RgScreen refreshing={refreshing} onRefresh={() => reload()} onEndReached={() => loadMore()}>
+      <RgScreen haptic refreshing={refreshing} onRefresh={() => reload()} onEndReached={() => loadMore()}>
         <RgAppbar title="Feed" />
         <RgText variant="bodyLarge">Pull to refresh and infinite scroll live on the screen here: (refresh) reloads, (endReached) appends the older posts, and [refreshing] drives the native spinner while the class works. In this demo the data is local, so the reload lands at once; in a real app the flag stays up while the fetch runs.</RgText>
         <RgButton variant="text" onPress={() => toggleLoading()}>Preview the loading skeleton</RgButton>
