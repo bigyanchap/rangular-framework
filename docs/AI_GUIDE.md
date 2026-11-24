@@ -1816,11 +1816,17 @@ One framework fix from the tutorial's phone retest: the search variant of `<inpu
   with `variant="text"` is the quiet form, for back links and
   secondary actions: no fill, primary coloured label, left
   aligned, same 48 high target. A button's `color` names a role,
-  never a paint: `primary` is the default gradient, `danger` is
-  the theme error role for a destructive action, and `neutral` is
-  the quiet surface variant grey for a cancelling one, with the
-  `text` variant colouring only its label. A static colour outside
-  the three is a `GEN_BUTTON_COLOR` error. A button sized
+  never a paint: `primary` is the default gradient, `secondary`
+  is the light member (white fading to tint, a primary label, a
+  hairline border), `danger` is red for a destructive action,
+  `warning` amber, `success` green, and `neutral` the slate grey
+  for a cancelling one. Every filled button is a three-stop
+  diagonal gradient in its role's hue family, light at the top
+  left and deep at the bottom right; a press deepens the
+  gradient one step, and a disabled button fades to a grey
+  gradient with a muted label. The `text` variant keeps no fill
+  and colours only its label. A static colour outside the six
+  is a `GEN_BUTTON_COLOR` error. A button sized
   exactly by a class in the component styles (a width or a
   height, the square action buttons of the tutorial's Pattern
   A demos) gets compact padding and a centred label, so the

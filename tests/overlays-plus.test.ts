@@ -126,7 +126,7 @@ test('button color roles reach RgButton as props', () => {
   assert.ok(result.code!.includes('color="danger"'), result.code!);
 });
 
-test('a button color outside the three roles is a GEN_BUTTON_COLOR error with the fix', () => {
+test('a button color outside the six roles is a GEN_BUTTON_COLOR error with the fix', () => {
   const result = compileFixture(FIXTURE_HTML.replace('color="danger"', 'color="red"'));
   const diag = result.diagnostics.find((d) => d.code === 'GEN_BUTTON_COLOR');
   assert.ok(diag, JSON.stringify(result.diagnostics));

@@ -132,15 +132,29 @@ test('the bottom nav answers a tab change with a haptic when asked', () => {
 
 test('the filled button wears the primary gradient', () => {
   assert.ok(primitivesSrc.includes('function ButtonFill('), 'the button fill is defined');
-  assert.ok(primitivesSrc.includes('const stopBottom = bottom ?? c.primaryDeep;'), 'the fill lands on primaryDeep by default');
-  assert.ok(primitivesSrc.includes('stopColor={stopBottom}'), 'the lower stop is the resolved colour');
+  assert.ok(primitivesSrc.includes('[c.primaryHi, c.gradientVia, c.gradientFrom]'), 'the primary stops run light, brand base, brand deep');
+  assert.ok(primitivesSrc.includes('stopColor={stops[1]}'), 'the middle stop is drawn at its offset');
+});
+
+test('every button colour role paints its own gradient stops', () => {
+  for (const line of [
+    '[c.secondaryHi, c.secondaryVia, c.secondaryDeep]',
+    '[c.dangerHi, c.dangerVia, c.dangerDeep]',
+    '[c.warningHi, c.warningVia, c.warningDeep]',
+    '[c.successHi, c.successVia, c.successDeep]',
+    '[c.neutralHi, c.neutralVia, c.neutralDeep]',
+    '[c.disabledHi, c.disabledVia, c.disabledDeep]',
+  ]) {
+    assert.ok(primitivesSrc.includes(line), 'the stops resolve: ' + line);
+  }
+  assert.ok(primitivesSrc.includes('buttonSecondary: { borderWidth: 1, borderColor: c.secondaryBorder }'), 'the light member keeps a hairline border');
 });
 
 test('the button fill follows the corner radius the caller set', () => {
-  assert.ok(primitivesSrc.includes('function ButtonFill({ top, bottom, radius }: any)'), 'the fill takes a radius');
+  assert.ok(primitivesSrc.includes('function ButtonFill({ stops, radius }: any)'), 'the fill takes a radius');
   assert.ok(primitivesSrc.includes('borderRadius: radius ?? t.radius.full'), 'the fill uses the given radius, the full curve by default');
   assert.ok(primitivesSrc.includes('const fillRadius = styleObj && typeof styleObj.borderRadius === \'number\' ? styleObj.borderRadius : theme.radius.full;'), 'the button resolves the fill radius from its style');
-  assert.ok(primitivesSrc.includes('<ButtonFill radius={fillRadius} />'), 'the primary fill receives the resolved radius');
+  assert.ok(primitivesSrc.includes('fillStops} radius={fillRadius} />'), 'the fill receives the resolved radius');
 });
 
 test('a button sized exactly by its caller gets compact padding and a centred label', () => {

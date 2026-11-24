@@ -1411,7 +1411,7 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
       case 'button': {
         const dis = el.propBindings.find((b) => b.name === 'disabled');
         const disabled = dis ? evalSafe(dis.expression, scope) === true : false;
-        const colorCls = el.attrs['color'] === 'danger' ? ' btn-danger' : el.attrs['color'] === 'neutral' ? ' btn-neutral' : '';
+        const colorCls = ['secondary', 'danger', 'warning', 'success', 'neutral'].indexOf(el.attrs['color']) >= 0 ? ' btn-' + el.attrs['color'] : '';
         const cls = (el.attrs['variant'] === 'text' ? 'btn btn-text' : 'btn') + colorCls;
         const tip = bound(el, 'tooltip', scope);
         return `<button class="${cls}" ${disabled ? 'disabled' : ''}${tip ? ` title="${escapeHtml(tip)}"` : ''}>${inner}${badgeHtml(el, scope)}</button>`;
@@ -1650,14 +1650,23 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
   .label { display: block; font-size: ${t.typography.label.fontSize}px; line-height: ${t.typography.label.lineHeight}px; font-weight: 600; letter-spacing: .4px; margin: 0; }
   .badge { display: inline-block; background: var(--primary-container); color: var(--on-primary-container); border-radius: ${t.radius.full}px; padding: 4px 12px; font-size: ${t.typography.caption.fontSize}px; font-weight: 700; }
   .card { background: var(--surface-variant); border: 1px solid var(--border); border-radius: ${t.radius.lg}px; padding: ${t.spacing.lg}px; margin: 0; display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
-  .btn { display: block; margin: 0; background: linear-gradient(180deg, var(--primary), var(--role-primary-deep)); color: var(--on-primary); border: none; border-radius: ${t.radius.full}px; padding: 0 ${t.spacing.xxl}px; min-height: 48px; font-size: ${t.typography.label.fontSize}px; font-weight: 600; cursor: pointer; }
-  .btn[disabled] { opacity: .38; cursor: default; }
+  .btn { display: block; margin: 0; background: linear-gradient(150deg, var(--role-primary-hi), var(--role-gradient-via) 55%, var(--role-gradient-from)); color: var(--role-on-gradient); border: none; border-radius: ${t.radius.full}px; padding: 0 ${t.spacing.xxl}px; min-height: 48px; font-size: ${t.typography.label.fontSize}px; font-weight: 600; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 8px rgba(11, 87, 208, .30); }
+  .btn:active:not([disabled]) { filter: brightness(.93); }
+  .btn[disabled] { cursor: default; }
+  .btn[disabled]:not(.btn-text) { background: linear-gradient(150deg, var(--role-disabled-hi), var(--role-disabled-via) 55%, var(--role-disabled-deep)); color: var(--text-muted); box-shadow: none; }
+  .btn-text[disabled] { opacity: .38; }
   .stack { display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
-  .btn-text { background: transparent; color: var(--primary); text-align: left; padding: 0 ${t.spacing.sm}px; }
-  .btn-danger { background: var(--role-danger); color: var(--role-on-error); }
-  .btn-neutral { background: var(--surface-variant); color: var(--role-on-surface-variant); }
-  .btn-text.btn-danger { background: transparent; color: var(--role-danger); }
-  .btn-text.btn-neutral { background: transparent; color: var(--text-muted); }
+  .btn-text { background: transparent; color: var(--primary); text-align: left; padding: 0 ${t.spacing.sm}px; box-shadow: none; }
+  .btn-secondary { background: linear-gradient(150deg, var(--role-secondary-hi), var(--role-secondary-via) 55%, var(--role-secondary-deep)); color: var(--role-secondary-label); border: 1px solid var(--role-secondary-border); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .9), 0 2px 6px rgba(11, 87, 208, .14); }
+  .btn-danger { background: linear-gradient(150deg, var(--role-danger-hi), var(--role-danger-via) 55%, var(--role-danger-deep)); color: var(--role-on-gradient); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 8px rgba(217, 48, 37, .30); }
+  .btn-warning { background: linear-gradient(150deg, var(--role-warning-hi), var(--role-warning-via) 55%, var(--role-warning-deep)); color: var(--role-on-gradient); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .4), 0 3px 8px rgba(242, 153, 0, .30); }
+  .btn-success { background: linear-gradient(150deg, var(--role-success-hi), var(--role-success-via) 55%, var(--role-success-deep)); color: var(--role-on-gradient); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 8px rgba(52, 168, 83, .30); }
+  .btn-neutral { background: linear-gradient(150deg, var(--role-neutral-hi), var(--role-neutral-via) 55%, var(--role-neutral-deep)); color: var(--role-on-gradient); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .35), 0 3px 8px rgba(95, 99, 104, .28); }
+  .btn-text.btn-danger { background: transparent; color: var(--role-danger); box-shadow: none; }
+  .btn-text.btn-neutral { background: transparent; color: var(--text-muted); box-shadow: none; }
+  .btn-text.btn-warning { background: transparent; color: var(--role-warning-text); box-shadow: none; }
+  .btn-text.btn-success { background: transparent; color: var(--role-success); box-shadow: none; }
+  .btn-text.btn-secondary { background: transparent; color: var(--primary); box-shadow: none; }
   .icon-btn { align-self: flex-start; width: 48px; height: 48px; display: inline-flex; align-items: center; justify-content: flex-start; background: transparent; border: none; padding: 0; cursor: pointer; }
   .form { display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
   .tab-panel { display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
@@ -6366,7 +6375,7 @@ function __buildCore(el, scope, path, form) {
       var b = document.createElement('button');
       var bColor = __controlValue(el, 'color', scope);
       b.className = (el.attrs['variant'] === 'text' ? 'btn btn-text' : 'btn') +
-        (bColor === 'danger' ? ' btn-danger' : bColor === 'neutral' ? ' btn-neutral' : '');
+        (['secondary', 'danger', 'warning', 'success', 'neutral'].indexOf(bColor) >= 0 ? ' btn-' + bColor : '');
       var bTip = __controlValue(el, 'tooltip', scope);
       if (bTip) b.title = String(bTip);
       if (__binding(el, 'disabled', scope)) b.disabled = true;

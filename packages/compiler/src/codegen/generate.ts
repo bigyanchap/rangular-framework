@@ -2892,18 +2892,19 @@ class Generator {
       if (mapping?.variant) props.push(`variant="${mapping.variant}"`);
       const isFormEl = el.tag.toLowerCase() === 'form';
       const isButtonEl = el.tag.toLowerCase() === 'button';
-      // A button's color role (primary by default, danger for a
-      // destructive action, neutral for a cancelling one) is a small
-      // validated surface: a static value outside the three is a
+      // A button's color role (primary by default, secondary for
+      // the light member, danger for a destructive action, warning,
+      // success, neutral for a cancelling one) is a small validated
+      // surface: a static value outside the six is a
       // GEN_BUTTON_COLOR error, a [color] binding passes through.
       if (isButtonEl && el.attrs['color'] !== undefined) {
         const color = el.attrs['color'];
-        if (color !== 'primary' && color !== 'danger' && color !== 'neutral') {
+        if (color !== 'primary' && color !== 'secondary' && color !== 'danger' && color !== 'warning' && color !== 'success' && color !== 'neutral') {
           diagnostics.push(error(
             'GEN_BUTTON_COLOR',
             `<button> color '${color}' is not a button colour role; the button keeps the primary colour`,
             el.pos.line, el.pos.column,
-            'Use color="primary" (the default), color="danger" for a destructive action, or color="neutral" for a cancelling one',
+            'Use color="primary" (the default), color="secondary" for the light member, color="danger" for a destructive action, color="warning", color="success", or color="neutral" for a cancelling one',
           ));
         }
       }
