@@ -377,3 +377,13 @@ test('calendar: the shown month follows an outside value change; the title opens
   assert.ok(calSrc.includes('pickerYears(draft.year, today.year)'), 'the jump year wheel reuses the picker years');
   assert.ok(calSrc.includes('calendarCheck'), 'the jump carries its check disc');
 });
+
+test('appbar: the actions render hoisted at the bar top right, outside the title row', () => {
+  const barStart = primitivesSrc.indexOf('export function RgAppbar');
+  const barSrc = primitivesSrc.slice(barStart, barStart + 14000);
+  assert.ok(barSrc.includes("position: 'absolute', top: tint ? 12 : 10, right: t.spacing.lg"), 'the actions anchor to the bar corner as its direct child');
+  assert.ok(!barSrc.includes('rightBits'), 'no right zone array carries the actions inside the row');
+  const previewSrc = fs.readFileSync(path.join(ROOT, 'packages/compiler/src/preview/renderPreview.ts'), 'utf8');
+  assert.ok(previewSrc.includes('.appbar-actions { position: absolute'), 'the preview anchors the actions the same way');
+  assert.ok(previewSrc.includes('bar.appendChild(actionsIcon)'), 'the runtime preview appends the actions to the bar, not the row');
+});

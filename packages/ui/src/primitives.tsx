@@ -1819,13 +1819,16 @@ export function RgAppbar({ title, search, menu, avatar, onMenu, titleAlign, tone
     </Pressable>
   ) : <RgIcon key="action2" name={actionIcon2} size={24} color={gradient ? 'onPrimary' : 'primary'} />) : null;
   const leftNode = back ? backNode : menuNode;
-  // The two actions travel as one array into the bar's right
-  // zone, so both carry keys from birth (phone round,
+  // The two actions carry keys from birth (phone round,
   // 2026-11-18: React's unique key warning named this array).
-  const rightBits = [actionNode, action2Node].filter(Boolean);
-  const rightNode = rightBits.length ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>{rightBits}</View>
-  ) : avatarNode;
+  // They render hoisted (top-right corner fix, 2026-11-24): a
+  // direct child of the bar, anchored to its top right corner,
+  // outside the title row. On device the row's last cell would
+  // not take touches (the lesson Save press, the Todo plus),
+  // while the same pressable fired anywhere else in the bar and
+  // everywhere in the web build; outside the row's layout the
+  // pressable answers to the bar alone.
+  const rightNode = avatarNode;
   const titleNode = search
     ? <Text style={[styles.searchText, gradient ? { color: c.onPrimary } : null, titleAlign === 'center' ? styles.appbarTitleCenter : null]}>{search}</Text>
     : <Text style={[styles.appbarTitle, gradient ? { color: c.onPrimary } : null, titleAlign === 'center' ? styles.appbarTitleCenter : null]}>{title}</Text>;
@@ -1849,7 +1852,7 @@ export function RgAppbar({ title, search, menu, avatar, onMenu, titleAlign, tone
     <View style={[styles.appbar, { flexDirection: 'column', alignItems: 'stretch' }, gradient ? styles.appbarGradient : null, plain ? styles.appbarPlain : null, tint ? styles.appbarTint : null, tint && pin ? { backgroundColor: 'transparent' } : null]}>
       {gradient ? <GradientFill /> : null}
       {hasRow ? (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
+        <View style={[{ flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }, titleAlign !== 'center' && (actionNode || action2Node) ? { paddingRight: actionNode && action2Node ? 104 : 52 } : null]}>
           {titleAlign === 'center' ? (
             <>
               <View style={styles.appbarSide}>{leftNode}</View>
@@ -1863,6 +1866,12 @@ export function RgAppbar({ title, search, menu, avatar, onMenu, titleAlign, tone
               {rightNode}
             </>
           )}
+        </View>
+      ) : null}
+      {(actionNode || action2Node) ? (
+        <View style={{ position: 'absolute', top: tint ? 12 : 10, right: t.spacing.lg, flexDirection: 'row', alignItems: 'center', gap: t.spacing.md }}>
+          {actionNode}
+          {action2Node}
         </View>
       ) : null}
       {children ? <View style={[styles.appbarChildren, hasRow ? null : { marginTop: 0 }]}>{children}</View> : null}

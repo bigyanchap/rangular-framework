@@ -1281,13 +1281,14 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
           ? `<span class="appbar-action">${iconSvg(actionIcon, 24, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
         const action2Node = actionIcon2
           ? `<span class="appbar-action">${iconSvg(actionIcon2, 24, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
-        const rightNode = (actionNode || action2Node)
-          ? `<span class="appbar-actions">${actionNode}${action2Node}</span>`
-          : avatar ? `<span class="avatar">${escapeHtml(String(avatar).charAt(0))}</span>` : '';
+        const rightNode = avatar ? `<span class="avatar">${escapeHtml(String(avatar).charAt(0))}</span>` : '';
+        const actionsNode = (actionNode || action2Node)
+          ? `<span class="appbar-actions">${actionNode}${action2Node}</span>` : '';
         const progRaw = rawBound(el, 'progress', scope);
         const progHtml = typeof progRaw === 'number'
           ? `<div class="appbar-progress"><div style="width:${Math.min(100, Math.max(0, progRaw))}%"></div></div>` : '';
         const centered = el.attrs['titleAlign'] === 'center';
+        const actionCls = (centered ? '' : (actionIcon ? ' has-action' : '') + (actionIcon2 ? ' has-action2' : ''));
         const midNode = search
           ? `<span class="search${centered ? ' center' : ''}">${escapeHtml(search)}</span>`
           : `<span class="appbar-title${centered ? ' center' : ''}">${escapeHtml(title)}</span>`;
@@ -1299,8 +1300,8 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
         // whose whole face is a child renders no title row, like
         // RgAppbar, so no empty band sits above the child.
         const hasRow = !!(title || search || leftIcon || rightNode);
-        if (!hasRow && inner) return `<header class="${barCls}">${inner}</header>` + progHtml;
-        return `<header class="${barCls}">${rowHtml}${inner ? `<div class="appbar-children">${inner}</div>` : ''}</header>` + progHtml;
+        if (!hasRow && inner) return `<header class="${barCls}${actionCls}">${actionsNode}${inner}</header>` + progHtml;
+        return `<header class="${barCls}${actionCls}">${rowHtml}${actionsNode}${inner ? `<div class="appbar-children">${inner}</div>` : ''}</header>` + progHtml;
       }
 
       case 'h1': return `<h1 class="display"${dirStyle}>${inner}</h1>`;
@@ -1601,7 +1602,12 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
      (spacing.md) as the gap between stacked blocks. Blocks carry no
      horizontal margins of their own, in either renderer. */
   .screen { position: relative; width: 360px; max-width: 100%; min-height: 640px; background: var(--screen-bg); color: var(--text); border-radius: 28px; overflow: hidden; box-shadow: 0 10px 28px rgba(0,0,0,.18); padding: ${t.spacing.md}px ${t.spacing.lg}px ${t.spacing.xxl}px; display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
-  .appbar { display: flex; align-items: center; gap: ${t.spacing.md}px; background: var(--surface-variant); border-radius: ${t.radius.full}px; padding: 10px ${t.spacing.lg}px; }
+  .appbar { position: relative; display: flex; align-items: center; gap: ${t.spacing.md}px; background: var(--surface-variant); border-radius: ${t.radius.full}px; padding: 10px ${t.spacing.lg}px; }
+  .appbar.has-action { padding-right: ${t.spacing.lg + 52}px; }
+  .appbar.has-action2 { padding-right: ${t.spacing.lg + 104}px; }
+  .appbar.has-children.has-action, .appbar.has-children.has-action2 { padding-right: ${t.spacing.lg}px; }
+  .appbar.has-children.has-action .appbar-row { padding-right: 52px; }
+  .appbar.has-children.has-action2 .appbar-row { padding-right: 104px; }
   .search { flex: 1; color: var(--text-muted); font-size: 14px; }
   .appbar-title { flex: 1; font-size: ${t.typography.title.fontSize}px; font-weight: 600; }
   /* Centered app bar title (tutorial round): fixed width side
@@ -1620,7 +1626,8 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
   .appbar.tint { background: linear-gradient(180deg, var(--role-wash-from), var(--role-wash-via) 55%, var(--role-wash-to)); border-radius: 0; box-shadow: none; }
   .appbar-progress { height: 3px; background: ${t.colors.border}; }
   .appbar-progress div { height: 3px; background: var(--primary); }
-  .appbar-actions { display: inline-flex; align-items: center; gap: 12px; }
+  .appbar-actions { position: absolute; top: 10px; right: ${t.spacing.lg}px; display: inline-flex; align-items: center; gap: 12px; }
+  .appbar.tint .appbar-actions { top: 12px; }
   .row.selected { background: ${t.colors.primaryContainer}; border-radius: ${t.radius.lg}px; }
   .appbar-children.flush { margin-top: 0; }
   .section-chip { width: 28px; height: 28px; border-radius: 50%; background: var(--primary); display: inline-flex; align-items: center; justify-content: center; flex: 0 0 28px; }
@@ -6253,14 +6260,16 @@ function __buildCore(el, scope, path, form) {
       var actionIcon = __attr(el, 'actionIcon', scope);
       var actionIcon2 = __attr(el, 'actionIcon2', scope);
       var avatar = __attr(el, 'avatar', scope);
-      var rightIcon = null;
+      var actionsIcon = null;
       if (actionIcon || actionIcon2) {
-        rightIcon = document.createElement('span');
-        rightIcon.className = 'appbar-actions';
-        if (actionIcon) rightIcon.appendChild(__icon(actionIcon, 24, gradientBar ? 'onPrimary' : 'primary'));
-        if (actionIcon2) rightIcon.appendChild(__icon(actionIcon2, 24, gradientBar ? 'onPrimary' : 'primary'));
+        actionsIcon = document.createElement('span');
+        actionsIcon.className = 'appbar-actions';
+        if (actionIcon) actionsIcon.appendChild(__icon(actionIcon, 24, gradientBar ? 'onPrimary' : 'primary'));
+        if (actionIcon2) actionsIcon.appendChild(__icon(actionIcon2, 24, gradientBar ? 'onPrimary' : 'primary'));
+        if (!centeredBar) bar.className += (actionIcon ? ' has-action' : '') + (actionIcon2 ? ' has-action2' : '');
       }
-      else if (avatar) {
+      var rightIcon = null;
+      if (avatar) {
         rightIcon = document.createElement('span');
         rightIcon.className = 'avatar';
         rightIcon.textContent = String(avatar).charAt(0);
@@ -6305,6 +6314,7 @@ function __buildCore(el, scope, path, form) {
         bar.appendChild(mid);
         if (rightIcon) bar.appendChild(rightIcon);
       }
+      if (actionsIcon) bar.appendChild(actionsIcon);
       var progVal = __attr(el, 'progress', scope);
       if (typeof progVal === 'number') {
         var prog = document.createElement('div');
