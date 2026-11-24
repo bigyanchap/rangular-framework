@@ -342,6 +342,7 @@ function initApp(dirArg: string): void {
       'expo-image-picker': '~58.0.10',
       react: '19.3.0',
       'react-native': '0.88.1',
+      'react-native-safe-area-context': '~5.6.0',
       'react-native-svg': '15.16.0',
       rxjs: '^7.8.2',
     },
@@ -527,6 +528,10 @@ ${fitBullet}
 - \`expo-haptics\` is required the same way: \`RgSwitch\` requires
   it lazily to answer a toggle with a haptic when a switch carries
   the \`haptic\` attribute. Keep it even if no switch uses it.
+- \`react-native-safe-area-context\` is required the same way:
+  \`RgScreen\` imports its provider and inset hook directly to
+  pad the screen by the phone's real safe-area insets on both
+  platforms. Keep it even though no template names it.
 ${metroBullet}
 
 ## Back behaviour

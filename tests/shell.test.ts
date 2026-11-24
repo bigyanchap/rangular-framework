@@ -236,6 +236,14 @@ test('switch haptic is opt-in: the attribute compiles, the primitive fires it, t
   assert.ok(html.includes('navigator.vibrate'), 'the live preview answers with a vibrate');
 });
 
+test('screen safe area: real insets on a plain view, the provider owned by the screen', () => {
+  assert.ok(primitivesSrc.includes("from 'react-native-safe-area-context'"), 'RgScreen imports safe-area-context');
+  assert.ok(primitivesSrc.includes('<SafeAreaProvider'), 'the screen renders the provider itself');
+  assert.ok(primitivesSrc.includes('useSafeAreaInsets()'), 'the screen body reads the insets');
+  assert.ok(primitivesSrc.includes('paddingTop: insets.top'), 'the root view is padded by the top inset');
+  assert.ok(!primitivesSrc.includes('<SafeAreaView'), 'the built-in SafeAreaView is gone (it pads nothing on Android)');
+});
+
 test('section chip and plain headers paint in the preview', () => {
   const chip = bodyOf(previewOf('<section label="Continue" icon="play" meta="Lesson 4 of 95"><p>x</p></section>'));
   assert.ok(chip.includes('section-chip'), 'the icon chip paints');

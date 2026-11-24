@@ -1501,6 +1501,26 @@ shell beside it and the behaviour fixes under both.
   varied row tiles, an icon row, and the two switches, one with
   `haptic` and one without.
 
+## The safe-area round (2026-11-24)
+
+The screen's root is no longer React Native's built-in
+SafeAreaView. That view applies the safe-area insets only on
+iOS; on Android it is a plain view, so Android apps on the
+framework ran under the status bar at the top and under the
+system buttons at the bottom (the tutorial's phone screenshots
+showed the clock over the menu icon and the system buttons over
+the bottom nav). `RgScreen` now renders a `SafeAreaProvider`
+from react-native-safe-area-context around its body, and the
+body pads a plain root View with the real insets on all four
+sides through `useSafeAreaInsets`. Absolutely placed layers
+(the wash, the veil, the melt, the bottom paint, the overlay
+layer) anchor to the root's border box, so their geometry is
+unchanged; only the flow content gains the insets.
+react-native-safe-area-context (~5.6.0) is therefore a required
+dependency of apps on @rangular-framework/ui, like
+expo-haptics: the scaffold writes it, and the ui package names
+it as a peer. Guard in `tests/shell.test.ts`.
+
 ## The spacing rule round (2026-11-17)
 
 One rule for how close components may sit, taken from Material

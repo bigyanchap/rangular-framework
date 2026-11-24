@@ -15,5 +15,8 @@
     "type": "git",
     "url": "git+https://github.com/bigyanchap/rangular-framework.git",
     "directory": "packages/ui"
+  },
+  "peerDependencies": {
+    "react-native-safe-area-context": ">=5.0.0"
   }
 }
