@@ -351,3 +351,19 @@ test('the editor is a framed block editor with its controls inside (0.6.0)', () 
   assert.ok(previewSrc.includes('.editor-tools { display: flex; flex-wrap: wrap;'), 'the preview tools row wraps too');
   assert.ok(!previewSrc.includes('editor-area'), 'the old preview textarea editor is gone');
 });
+
+test('row avatar: a numeric avatarText stands whole, words cut to initials', () => {
+  const rowStart = primitivesSrc.indexOf('export function RgRow');
+  const rowSrc = primitivesSrc.slice(rowStart, rowStart + 6500);
+  assert.ok(rowSrc.includes('/^\\d+$/.test(avatarRaw)'), 'RgRow keeps a numeric avatar label whole');
+  assert.ok(rowSrc.includes('avatarLabel.length > 2 ? 11'), 'a three character label takes the smaller size');
+});
+
+test('calendar: the shown month follows an outside value change; the title opens the jump wheels', () => {
+  const calStart = primitivesSrc.indexOf('export function RgCalendar');
+  const calSrc = primitivesSrc.slice(calStart, calStart + 7000);
+  assert.ok(calSrc.includes('lastValueRef'), 'the calendar tracks the last value it saw');
+  assert.ok(calSrc.includes('calendarTitlePill'), 'the title is the jump pill');
+  assert.ok(calSrc.includes('pickerYears(draft.year, today.year)'), 'the jump year wheel reuses the picker years');
+  assert.ok(calSrc.includes('calendarCheck'), 'the jump carries its check disc');
+});

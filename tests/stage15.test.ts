@@ -521,6 +521,51 @@ test('preview behaviour: the calendar moves months and a day tap reports the ISO
   assert.ok(app.textContent.includes('Day 2026-12-25'), 'the tap reported the tapped day as ISO');
 });
 
+test('preview behaviour: the calendar follows an outside value change', () => {
+  const app = previewOf(
+    '<screen><calendar [value]="day" (change)="pick($event)"></calendar><button (click)="seed()">Seed</button><p>Day {{ day }}</p></screen>',
+    'day = "2026-11-13T00:00:00"; pick(v: string) { this.day = v; } seed() { this.day = "2026-11-13T00:00:00"; }',
+  );
+  findAll(app, (e) => hasClass(e, 'calendar-prev'))[0].click();
+  findAll(app, (e) => hasClass(e, 'calendar-prev'))[0].click();
+  findAll(app, (e) => hasClass(e, 'calendar-prev'))[0].click();
+  findAll(app, (e) => hasClass(e, 'calendar-prev'))[0].click();
+  assert.ok(app.textContent.includes('Jul 2026'), 'browsed back to July');
+  const dayBtn = findAll(app, (e) => hasClass(e, 'calendar-day') && e.textContent === '15')[0];
+  dayBtn.click();
+  assert.ok(app.textContent.includes('Day 2026-07-15'), 'the July pick landed');
+  const seedBtn = findAll(app, (e) => e.tagName === 'BUTTON' && e.textContent === 'Seed')[0];
+  seedBtn.click();
+  assert.ok(app.textContent.includes('Nov 2026'), 'the outside change pulls the shown month back');
+  assert.ok(findAll(app, (e) => hasClass(e, 'calendar-day') && hasClass(e, 'selected') && e.textContent === '13').length, 'the seed day is selected again');
+});
+
+test('preview behaviour: the calendar title opens month and year wheels', () => {
+  const app = previewOf(
+    '<screen><calendar [value]="day" (change)="pick($event)"></calendar><p>Day {{ day }}</p></screen>',
+    'day = "2026-11-13T00:00:00"; pick(v: string) { this.day = v; }',
+  );
+  findAll(app, (e) => hasClass(e, 'calendar-title-btn'))[0].click();
+  const yearBtn = findAll(app, (e) => hasClass(e, 'wheel-value') && e.textContent === '2028')[0];
+  assert.ok(yearBtn, 'the year wheel offers 2028');
+  yearBtn.click();
+  findAll(app, (e) => hasClass(e, 'wheel-value') && e.textContent === 'Mar')[0].click();
+  findAll(app, (e) => hasClass(e, 'calendar-check'))[0].click();
+  assert.ok(app.textContent.includes('Mar 2028'), 'the check applies the jump');
+});
+
+test('chart bars are frosted paths in the bar colour family', () => {
+  const model = chartModel('bar', [{ label: 'Mon', value: 10 }], 200, 100, COLOR_SWATCHES, '#000000');
+  const paths = model.shapes.filter((s) => s.kind === 'path');
+  assert.equal(paths.length, 2, 'a body path and a gloss path');
+  const body = paths[0] as { d: string; fill?: string; stroke?: string };
+  assert.equal(body.stroke, '#0b57d0', 'the edge keeps the bar colour');
+  assert.equal(body.fill, '#79a3e5', 'the body is the colour mixed toward white');
+  assert.ok(body.d.startsWith('M 40 100 L 40 10 Q 40 4 46 4'), 'the top corners round');
+  const gloss = paths[1] as { fill?: string };
+  assert.equal(gloss.fill, '#bbd0f2', 'the gloss band is paler still');
+});
+
 test('blocks parity: the page runtime mirrors the TypeScript block model', () => {
   const sandbox = previewSandboxOf('<screen><p>x</p></screen>', '');
   const pageParse = sandbox['__edParse'] as (v: string) => unknown;
@@ -688,7 +733,7 @@ test('preview behaviour: masonry carries its class, and the server paint covers 
   assert.ok(paint.includes('class="skeleton circle"'), 'the skeleton paints');
   assert.equal((paint.match(/class="otp-box/g) ?? []).length, 4, 'four otp boxes paint');
   assert.ok(paint.includes('calendar-day selected'), 'the calendar paints its selected day');
-  assert.ok(paint.includes('<svg') && paint.includes('<rect'), 'the chart paints real SVG shapes');
+  assert.ok(paint.includes('<svg') && paint.includes('<path'), 'the chart paints real SVG shapes');
   assert.ok(paint.includes('>EW</span>'), 'the avatar paints initials');
   assert.ok(paint.includes('No mail'), 'the empty state paints its title');
   assert.ok(paint.includes('<img class="rg-image"'), 'the image paints');

@@ -252,6 +252,14 @@ test('row icon and varied avatar tones paint in the preview', () => {
   assert.ok(varied.includes('background:#e8f0fe'), 'the varied tone paints its pastel pair');
 });
 
+test('a three-digit avatar number stands whole in the preview', () => {
+  const body = bodyOf(previewOf('<row avatar avatarText="100" title="Lesson 100"></row>'));
+  assert.ok(body.includes('>100<'), 'the full number paints, not a two character cut');
+  assert.ok(body.includes('font-size:11px'), 'the longer label takes the smaller size');
+  const cut = bodyOf(previewOf('<row avatar avatarText="Editor" title="Editor"></row>'));
+  assert.ok(cut.includes('>Ed<'), 'a word still cuts to two initials');
+});
+
 test('the keyboard contract lives in the shipped screen and fields', () => {
   assert.ok(primitivesSrc.includes('KeyboardAvoidingView'), 'the screen avoids the keyboard');
   assert.ok(primitivesSrc.includes('keyboardShouldPersistTaps'), 'taps persist while the keyboard is up');
