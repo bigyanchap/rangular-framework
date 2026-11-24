@@ -1278,9 +1278,9 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
         const actionIcon = bound(el, 'actionIcon', scope);
         const actionIcon2 = bound(el, 'actionIcon2', scope);
         const actionNode = actionIcon
-          ? `<span class="appbar-action">${iconSvg(actionIcon, 24, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
+          ? `<span class="appbar-action">${iconSvg(actionIcon, 28, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
         const action2Node = actionIcon2
-          ? `<span class="appbar-action">${iconSvg(actionIcon2, 24, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
+          ? `<span class="appbar-action">${iconSvg(actionIcon2, 28, gradientBar ? 'onPrimary' : 'primary')}</span>` : '';
         const rightNode = (actionNode || action2Node)
           ? `<span class="appbar-actions">${actionNode}${action2Node}</span>`
           : avatar ? `<span class="avatar">${escapeHtml(String(avatar).charAt(0))}</span>` : '';
@@ -6257,8 +6257,8 @@ function __buildCore(el, scope, path, form) {
       if (actionIcon || actionIcon2) {
         rightIcon = document.createElement('span');
         rightIcon.className = 'appbar-actions';
-        if (actionIcon) rightIcon.appendChild(__icon(actionIcon, 24, gradientBar ? 'onPrimary' : 'primary'));
-        if (actionIcon2) rightIcon.appendChild(__icon(actionIcon2, 24, gradientBar ? 'onPrimary' : 'primary'));
+        if (actionIcon) rightIcon.appendChild(__icon(actionIcon, 28, gradientBar ? 'onPrimary' : 'primary'));
+        if (actionIcon2) rightIcon.appendChild(__icon(actionIcon2, 28, gradientBar ? 'onPrimary' : 'primary'));
       }
       else if (avatar) {
         rightIcon = document.createElement('span');

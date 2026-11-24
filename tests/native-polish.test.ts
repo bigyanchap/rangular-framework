@@ -369,6 +369,16 @@ test('otp: the hidden field joins the keyboard lift; the number pad carries a ch
   assert.ok(otpSrc.includes('otpCheck'), 'the accessory carries the check disc');
 });
 
+test('appbar: bar buttons dispatch through the latest-callbacks ref; action glyphs are 28', () => {
+  const barStart = primitivesSrc.indexOf('export function RgAppbar');
+  const barSrc = primitivesSrc.slice(barStart, barStart + 12000);
+  assert.ok(barSrc.includes('cbRef.current = { onMenu, onBack, onAction, onAction2 }'), 'every render refreshes the callbacks ref');
+  assert.ok(barSrc.includes('onPress={fireAction}'), 'the action press dispatches through the ref');
+  assert.ok(barSrc.includes('onPress={fireBack}'), 'the back press dispatches through the ref');
+  assert.ok(barSrc.includes('name={actionIcon} size={28}'), 'the action glyph stands at 28');
+  assert.ok(barSrc.includes('name={actionIcon2} size={28}'), 'the second action glyph stands at 28');
+});
+
 test('calendar: the shown month follows an outside value change; the title opens the jump wheels', () => {
   const calStart = primitivesSrc.indexOf('export function RgCalendar');
   const calSrc = primitivesSrc.slice(calStart, calStart + 7000);
