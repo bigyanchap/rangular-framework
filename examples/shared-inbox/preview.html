@@ -277,6 +277,9 @@
   .timeline-time { font-size: 12px; color: var(--text-muted); }
   .calendar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .calendar-title { font-size: 20px; font-weight: 600; color: var(--text); }
+  .calendar-title-pill { display: inline-flex; align-items: center; gap: 4px; background: var(--role-primary-container); border: none; border-radius: 9999px; padding: 4px 12px; cursor: pointer; font-family: inherit; }
+  .calendar-jump-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+  .calendar-check { width: 38px; height: 38px; border-radius: 50%; border: none; background: var(--primary); display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
   .calendar-week { display: flex; }
   .calendar-week-cell { flex: 1; text-align: center; font-size: 12px; font-weight: 600; color: var(--text-muted); padding: 4px 0; }
   .calendar-grid { display: flex; flex-wrap: wrap; }
@@ -1243,6 +1246,15 @@ function __chartColor(point, index, palette) {
   var c = palette[index % Math.max(palette.length, 1)];
   return c === undefined || c === null ? '#000000' : c;
 }
+function __mixHex(hex, other, frac) {
+  var m = /^#([0-9a-fA-F]{6})$/.exec(hex);
+  var o = /^#([0-9a-fA-F]{6})$/.exec(other);
+  if (!m || !o) return hex;
+  var a = parseInt(m[1], 16);
+  var b = parseInt(o[1], 16);
+  var ch = function (shift) { return Math.round(((a >> shift) & 255) * (1 - frac) + ((b >> shift) & 255) * frac); };
+  return '#' + ((1 << 24) + (ch(16) << 16) + (ch(8) << 8) + ch(0)).toString(16).slice(1);
+}
 function __chartModel(type, data, width, height, palette, labelColor) {
   var points = __normalizeChartData(data);
   var w = Math.max(40, Math.floor(width) || 40);
@@ -1314,7 +1326,16 @@ function __chartModel(type, data, width, height, palette, labelColor) {
   points.forEach(function (p, i) {
     var v = Math.max(0, p.value);
     var h = v / barMax * (plotH - 4);
-    shapes.push({ kind: 'rect', x: __r2(slot * i + slot * 0.2), y: __r2(plotH - h), width: __r2(barW), height: __r2(h), fill: __chartColor(p, i, palette) });
+    var x = slot * i + slot * 0.2;
+    var y = plotH - h;
+    var colour = __chartColor(p, i, palette);
+    if (h > 0) {
+      var r = Math.min(6, barW / 2, h / 2);
+      var top = 'M ' + __r2(x) + ' ' + __r2(y + h) + ' L ' + __r2(x) + ' ' + __r2(y + r) + ' Q ' + __r2(x) + ' ' + __r2(y) + ' ' + __r2(x + r) + ' ' + __r2(y) + ' L ' + __r2(x + barW - r) + ' ' + __r2(y) + ' Q ' + __r2(x + barW) + ' ' + __r2(y) + ' ' + __r2(x + barW) + ' ' + __r2(y + r);
+      shapes.push({ kind: 'path', d: top + ' L ' + __r2(x + barW) + ' ' + __r2(y + h) + ' Z', fill: __mixHex(colour, '#ffffff', 0.45), stroke: colour, strokeWidth: 1 });
+      var gh = Math.max(0, h * 0.45);
+      if (gh > 1) shapes.push({ kind: 'path', d: top + ' L ' + __r2(x + barW) + ' ' + __r2(y + gh) + ' L ' + __r2(x) + ' ' + __r2(y + gh) + ' Z', fill: __mixHex(colour, '#ffffff', 0.72) });
+    }
     shapes.push({ kind: 'text', x: __r2(slot * i + slot / 2), y: plotH + 14, text: p.label, fill: labelColor, size: 12, anchor: 'middle' });
   });
   return { width: w, height: plotH + 18, shapes: shapes };
@@ -3439,9 +3460,25 @@ function __buildTimeline(el, scope, path, form) {
 function __buildCalendar(el, scope, path) {
   var wrap = document.createElement('div');
   wrap.className = 'calendar';
-  var selected = __parseParts(__controlValue(el, 'value', scope));
+  var rawValue = __controlValue(el, 'value', scope);
+  var selected = __parseParts(rawValue);
   var today = __nowParts();
-  var shown = __calendarStates[path] || (selected ? { year: selected.year, month: selected.month } : { year: today.year, month: today.month });
+  var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  var st = __calendarStates[path];
+  if (!st) {
+    var seed = selected || today;
+    st = { year: seed.year, month: seed.month, lastValue: rawValue, jumping: false, dYear: seed.year, dMonth: seed.month };
+    __calendarStates[path] = st;
+  } else if (st.lastValue !== rawValue) {
+    // The shown month follows an outside value change, as the
+    // app's calendar does (2026-11-24).
+    st.lastValue = rawValue;
+    if (selected && (selected.year !== st.year || selected.month !== st.month)) {
+      st.year = selected.year;
+      st.month = selected.month;
+    }
+  }
+  var shown = st;
   var head = document.createElement('div');
   head.className = 'calendar-head';
   var prev = document.createElement('button');
@@ -3450,26 +3487,79 @@ function __buildCalendar(el, scope, path) {
   prev.appendChild(__icon('chevron-left', 24, 'text'));
   prev.addEventListener('click', function () {
     var total = shown.year * 12 + (shown.month - 1) - 1;
-    __calendarStates[path] = { year: Math.floor(total / 12), month: (total % 12) + 1 };
+    shown.year = Math.floor(total / 12);
+    shown.month = (total % 12) + 1;
     __render();
   });
   head.appendChild(prev);
-  var titleSpan = document.createElement('span');
-  titleSpan.className = 'calendar-title';
-  var monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  titleSpan.textContent = monthNames[shown.month - 1] + ' ' + shown.year;
-  head.appendChild(titleSpan);
+  var titleBtn = document.createElement('button');
+  titleBtn.type = 'button';
+  titleBtn.className = 'calendar-title calendar-title-pill calendar-title-btn';
+  titleBtn.textContent = monthNames[shown.month - 1] + ' ' + shown.year;
+  titleBtn.appendChild(__icon('chevron-down', 16, 'primary'));
+  titleBtn.addEventListener('click', function () {
+    if (shown.jumping) {
+      shown.jumping = false;
+    } else {
+      shown.dYear = shown.year;
+      shown.dMonth = shown.month;
+      shown.jumping = true;
+    }
+    __render();
+  });
+  head.appendChild(titleBtn);
   var next = document.createElement('button');
   next.type = 'button';
   next.className = 'icon-btn calendar-next';
   next.appendChild(__icon('chevron-right', 24, 'text'));
   next.addEventListener('click', function () {
     var total = shown.year * 12 + (shown.month - 1) + 1;
-    __calendarStates[path] = { year: Math.floor(total / 12), month: (total % 12) + 1 };
+    shown.year = Math.floor(total / 12);
+    shown.month = (total % 12) + 1;
     __render();
   });
   head.appendChild(next);
   wrap.appendChild(head);
+  if (shown.jumping) {
+    var wheels = document.createElement('div');
+    wheels.className = 'wheels';
+    var mkWheel = function (values, current, pick) {
+      var col = document.createElement('div');
+      col.className = 'wheel';
+      values.forEach(function (v) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'wheel-value' + (v.value === current ? ' selected' : '');
+        b.textContent = v.label;
+        b.addEventListener('click', function () { pick(v.value); __render(); });
+        col.appendChild(b);
+      });
+      return col;
+    };
+    var years = [];
+    var yStart = Math.min(today.year - 150, shown.dYear);
+    var yEnd = Math.max(today.year + 150, shown.dYear);
+    for (var y = yStart; y <= yEnd; y++) years.push({ value: y, label: '' + y });
+    wheels.appendChild(mkWheel(years, shown.dYear, function (v) { shown.dYear = v; }));
+    var months = monthNames.map(function (label, i) { return { value: i + 1, label: label }; });
+    wheels.appendChild(mkWheel(months, shown.dMonth, function (v) { shown.dMonth = v; }));
+    wrap.appendChild(wheels);
+    var jrow = document.createElement('div');
+    jrow.className = 'calendar-jump-row';
+    var chk = document.createElement('button');
+    chk.type = 'button';
+    chk.className = 'calendar-check';
+    chk.appendChild(__icon('check', 20, 'onPrimary'));
+    chk.addEventListener('click', function () {
+      shown.year = shown.dYear;
+      shown.month = shown.dMonth;
+      shown.jumping = false;
+      __render();
+    });
+    jrow.appendChild(chk);
+    wrap.appendChild(jrow);
+    return wrap;
+  }
   var week = document.createElement('div');
   week.className = 'calendar-week';
   ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].forEach(function (d) {
@@ -4781,7 +4871,8 @@ function __buildCore(el, scope, path, form) {
         var avl = document.createElement('span');
         avl.className = 'avatar-lg';
         var avText = __attr(el, 'avatarText', scope);
-        avl.textContent = avText ? String(avText).slice(0, 2) : (title ? String(title) : '•').charAt(0);
+        avl.textContent = avText ? (/^\d+$/.test(String(avText)) ? String(avText) : String(avText).slice(0, 2)) : (title ? String(title) : '•').charAt(0);
+        if (avl.textContent.length > 2) avl.style.fontSize = '11px';
         var avTone = __attr(el, 'avatarTone', scope) || el.attrs['avatarTone'];
         if (avTone === 'varied') {
           var avLabel = avl.textContent;
