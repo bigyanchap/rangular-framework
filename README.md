@@ -6,6 +6,10 @@
 
 **Write Angular, Ship React Native.**
 
+The vibe coding first framework for mobile apps. **Built for
+AI-driven software factories with rigorous verification at every
+step.**
+
 The Rangular framework is a standalone transpiler: you write Angular-style code, TypeScript
 classes with `@Component`, HTML-like templates, dependency injection, and
 Rangular compiles it to React Native `.tsx`. The transpiler's target is React
@@ -51,6 +55,25 @@ If `rg` on your machine is ripgrep, use the long name instead:
 One status note: the packages are not on npm yet, so until the first
 publish the same journey runs from a clone, as the Status today
 section of [INSTALLATION.md](INSTALLATION.md) spells out.
+
+## Verification, at every step
+
+You, or your AI, write the app. The framework checks the work.
+Every construct the compiler cannot carry produces a coded
+diagnostic with a concrete fix: a handler that names a missing
+method, a prop that does not exist, a style value off the design
+scale, a state read that would see a stale value. Strict mode is on
+by default in a scaffolded app, so warnings fail the build instead
+of quietly changing the page. One command, `rg verify`, runs the
+strict build, the polish linter, your tests and a render check, and
+its `--json` form hands the whole verdict to a pipeline or an AI
+loop as data. `rg fix` applies the repairs whose outcome is already
+known. The contract is in [docs/VERIFICATION.md](docs/VERIFICATION.md),
+a measured comparison with raw React Native is in
+[docs/BENCHMARK.md](docs/BENCHMARK.md), the loop for people directing
+an AI is in [docs/VIBE_CODING.md](docs/VIBE_CODING.md), and the
+adoption brief for organizations is in
+[docs/FOR_TEAMS.md](docs/FOR_TEAMS.md).
 
 ## Modern Angular stance
 

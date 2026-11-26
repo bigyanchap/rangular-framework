@@ -1884,6 +1884,8 @@ The CLI is complete in v1. One line per command:
 | `rg init <dir>` | Scaffold a starter project (welcome screen, README, .gitignore); refuses a non-empty directory |
 | `rg init <name> --app` | Scaffold a real Expo app (Stage 12): a bare name lands in the checkout's `apps/` folder, an explicit path is used as given; the starter component is compiled into `src/AppRoot.tsx` at scaffold time. See the Expo app scaffold section above |
 | `rg doctor <component.ts> [--json]` | The polish linter below |
+| `rg verify [<component.ts>] [--json] [--no-strict]` | The one gate: strict build, doctor, the app's test script when it has one, and a render of the root preview; the exit code is the verdict, `--json` carries stages and diagnostics as data |
+| `rg fix [<component.ts>] [--json]` | Apply the mechanical fixes: off-scale style values written back snapped, unsupported style properties removed with a comment, a prop renamed when the catalog holds exactly one near match; ends with a fresh compile |
 
 **Per-file diagnostics.** Every diagnostic may carry a `file`: template
 diagnostics name the `.html` file, class diagnostics the `.ts` file,
@@ -1916,6 +1918,23 @@ error) exists; warnings alone exit 0. One suppression exists: a CSS
 comment containing `doctor: allow-hex` in a style text disables
 `DOC_HEX_COLOR` for that file's styles, for deliberate brand colours
 that are not Material roles (see the day-plan-row recipe card).
+
+**Verification: strict mode, `rg verify`, `rg fix`.** A scaffolded
+app carries `rangular.json` with `"strict": true`: `rg build` and
+`rg doctor` in that folder treat every warning as an error, so a
+dropped declaration or a snapped value stops the build instead of
+quietly changing the page. `--strict` forces it for one run,
+`--no-strict` relaxes one run. Three diagnostics guard the classes
+that used to fail silently: `TPL_HANDLER` (error) when an event
+binding names a method the component does not have, `GEN_UNKNOWN_PROP`
+(error) when an attribute or binding on a known element is not one
+of its catalog props, and `GEN_FIELD_REREAD` (warning) when a
+component method assigns a field, reads it, and assigns it again,
+because the read sees the value from before the method ran; carry
+the value in a local const and assign once. The working loop is:
+write, run `rg verify`, apply the named fixes (or `rg fix` for the
+mechanical ones), run `rg verify` again, and call the work done
+only on a clean run. The full contract is docs/VERIFICATION.md.
 
 **Style snapshot goldens.** Each example carries a
 `styles.snapshot.json`: the preview's resolved key styles per element

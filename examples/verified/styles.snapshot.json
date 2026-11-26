@@ -1,0 +1,115 @@
+{
+  "example": "verified",
+  "themes": {
+    "light": {
+      "roles": {
+        "button": {
+          "background": "#0b57d0",
+          "color": "#ffffff",
+          "borderRadius": 9999,
+          "minHeight": 48
+        },
+        "screen": {
+          "background": "#ffffff",
+          "color": "#1f1f1f"
+        },
+        "switch": {
+          "background": "#f0f4f9",
+          "borderColor": "#747775",
+          "knobBackground": "#5f6368",
+          "checkedBackground": "#0b57d0",
+          "checkedKnobBackground": "#ffffff",
+          "borderRadius": 9999,
+          "width": 52,
+          "height": 32
+        },
+        "textBody": {
+          "fontSize": 16,
+          "lineHeight": 24,
+          "color": "#1f1f1f"
+        },
+        "textTitle": {
+          "fontSize": 20,
+          "lineHeight": 28,
+          "fontWeight": 600
+        }
+      },
+      "styles": {
+        "band": {
+          "backgroundColor": "#e8f0fe",
+          "padding": 16,
+          "borderRadius": 12
+        },
+        "grow": {
+          "flex": 1
+        },
+        "muted": {
+          "fontSize": 14,
+          "color": "#5f6368",
+          "marginTop": 8
+        },
+        "rowline": {
+          "flexDirection": "row",
+          "alignItems": "center",
+          "gap": 12,
+          "marginTop": 12
+        }
+      }
+    },
+    "dark": {
+      "roles": {
+        "button": {
+          "background": "#a8c7fa",
+          "color": "#062e6f",
+          "borderRadius": 9999,
+          "minHeight": 48
+        },
+        "screen": {
+          "background": "#131314",
+          "color": "#e3e3e3"
+        },
+        "switch": {
+          "background": "#282a2c",
+          "borderColor": "#8e918f",
+          "knobBackground": "#9aa0a6",
+          "checkedBackground": "#a8c7fa",
+          "checkedKnobBackground": "#062e6f",
+          "borderRadius": 9999,
+          "width": 52,
+          "height": 32
+        },
+        "textBody": {
+          "fontSize": 16,
+          "lineHeight": 24,
+          "color": "#e3e3e3"
+        },
+        "textTitle": {
+          "fontSize": 20,
+          "lineHeight": 28,
+          "fontWeight": 600
+        }
+      },
+      "styles": {
+        "band": {
+          "backgroundColor": "#e8f0fe",
+          "padding": 16,
+          "borderRadius": 12
+        },
+        "grow": {
+          "flex": 1
+        },
+        "muted": {
+          "fontSize": 14,
+          "color": "#5f6368",
+          "marginTop": 8
+        },
+        "rowline": {
+          "flexDirection": "row",
+          "alignItems": "center",
+          "gap": 12,
+          "marginTop": 12
+        }
+      }
+    }
+  }
+}

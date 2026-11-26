@@ -1,6 +1,6 @@
 {
   "name": "rangular-framework",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "tags": [
     {
       "tag": "div",
@@ -2819,6 +2819,18 @@
     {
       "code": "GEN_UNKNOWN_TAG",
       "meaning": "A template tag is not a known Rangular block; it was emitted as <View>."
+    },
+    {
+      "code": "TPL_HANDLER",
+      "meaning": "A template event binding names a method the component does not have; the handler would fail when the event fires."
+    },
+    {
+      "code": "GEN_UNKNOWN_PROP",
+      "meaning": "An attribute or binding on a known element is not one of that element's props; it would be passed through and ignored."
+    },
+    {
+      "code": "GEN_FIELD_REREAD",
+      "meaning": "A method assigns a field, reads it, then assigns it again; the read sees the value from before the method ran, not the assigned value."
     },
     {
       "code": "GEN_FIELD",

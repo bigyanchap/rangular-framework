@@ -1,0 +1,11 @@
+<screen>
+  <section class="band">
+    <h3>{{ title }}</h3>
+    <section class="rowline">
+      <p class="grow">Notifications</p>
+      <switch [checked]="notify" (change)="onNotify($event)"></switch>
+    </section>
+  </section>
+  <p class="muted">Saved {{ saves }} times</p>
+  <button color="primary" (click)="save()">Save</button>
+</screen>
