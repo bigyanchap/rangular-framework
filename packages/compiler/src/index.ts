@@ -19,3 +19,4 @@ export * from './codegen/sourceMap';
 export * from './doctor';
 export * from './compile';
 export * from './catalog';
+export * from './fix';

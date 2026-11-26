@@ -6,6 +6,7 @@ import { DirectiveStyleAssign, directiveStyles } from '../class/parseDirective';
 import { ResolvedRoute } from '../class/parseRoutes';
 import { analyzeFormInitializer, builderDepsOf, FormFieldInfo, isFormInitializer, isSignalInitializer, isStreamInitializer, rewriteBuilderInitializer, signalKindOf } from '../class/formInit';
 import { Diagnostic, error, warning } from '../diagnostics';
+import { CODEGEN_ATTRS, ELEMENT_EXTRA_PROPS, ELEMENT_PROPS, GLOBAL_ATTRS } from '../propTable';
 import { nearestOnScale, ParsedCss } from '../style/css';
 import { ElementNode, EventBinding, TemplateNode, TemplateRoot } from '../template/ast';
 import { Expr, exprAstToCode, exprToCode, parseExpression } from '../template/expr';
@@ -1326,6 +1327,68 @@ class Generator {
         validateControlNesting(node.children, tag);
       }
     };
+    // Verification fortification (2026-11-26): two author mistakes that
+    // used to stay silent until runtime are compile errors now. A template
+    // event binding that names a method the component does not have fails
+    // here (TPL_HANDLER) instead of at tap time, and an attribute or
+    // binding that is not one of the element's props fails here
+    // (GEN_UNKNOWN_PROP) instead of passing through to be ignored.
+    const methodNames = new Set(component.methods);
+    const fieldNames = new Set(component.fields.map((f) => f.name));
+    const nearProp = (name: string, allowed: string[]): string | undefined => {
+      let best: string | undefined;
+      let bestDist = 3;
+      for (const cand of allowed) {
+        let d = Math.abs(cand.length - name.length);
+        for (let i = 0; i < Math.min(cand.length, name.length); i++) if (cand[i] !== name[i]) d++;
+        if (d < bestDist) { bestDist = d; best = cand; }
+      }
+      return best;
+    };
+    const directiveNames = new Set<string>();
+    for (const [attr, entry3] of this.directivesByAttr) {
+      directiveNames.add(attr);
+      for (const inp of entry3.info.inputs) directiveNames.add(inp.name);
+    }
+    const validateBindings = (nodes: TemplateNode[]): void => {
+      for (const node of nodes) {
+        if (node.type !== 'element') continue;
+        for (const ev of node.eventBindings) {
+          const expr = ev.expression.trim();
+          const m = /^([A-Za-z_$][\w$]*)\s*\(/.exec(expr) ?? /^([A-Za-z_$][\w$]*)$/.exec(expr);
+          if (m && !methodNames.has(m[1]) && !fieldNames.has(m[1])) {
+            diagnostics.push(error(
+              'TPL_HANDLER',
+              `(${ev.name})="${ev.expression}" names method '${m[1]}', which ${component.className} does not have; the handler would fail when the event fires`,
+              node.pos.line, node.pos.column,
+              `Add a method named ${m[1]}() to ${component.className}, or change the binding to one of its methods: ${component.methods.slice(0, 6).join(', ') || '(none yet)'}`,
+            ));
+          }
+        }
+        const tag = node.tag.toLowerCase();
+        const mapping = TAG_MAP[tag];
+        if (mapping?.fromUi && ELEMENT_PROPS[tag]) {
+          const allowed = [...ELEMENT_PROPS[tag], ...(ELEMENT_EXTRA_PROPS[tag] ?? []), ...GLOBAL_ATTRS, ...CODEGEN_ATTRS];
+          const allowedSet = new Set(allowed);
+          const names = [...Object.keys(node.attrs), ...node.booleanAttrs, ...node.propBindings.map((b) => b.name), ...node.twoWayBindings.map((b) => b.name)];
+          for (const name of names) {
+            if (name.startsWith('data-') || name.startsWith('aria-')) continue;
+            if (name.startsWith('class.')) continue; // [class.x] toggles: GEN_CLASS_BINDING judges the class name
+            if (directiveNames.has(name)) continue;
+            if (allowedSet.has(name)) continue;
+            const near = nearProp(name, allowed);
+            diagnostics.push(error(
+              'GEN_UNKNOWN_PROP',
+              `'${name}' is not a prop of <${tag}>; it would be passed through and ignored`,
+              node.pos.line, node.pos.column,
+              near ? `Did you mean '${near}'?` : `See the catalog entry for <${tag}> for the props it accepts`,
+            ));
+          }
+        }
+        validateBindings(node.children);
+      }
+    };
+    validateBindings(ast.children);
     validateControlNesting(ast.children);
 
     // Overlays (Stage 10): a <sheet> or <dialog> is driven by its

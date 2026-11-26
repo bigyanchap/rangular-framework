@@ -7,11 +7,11 @@ import { renderPreview } from '../packages/compiler/src/preview/renderPreview';
 
 const ROOT = path.join(__dirname, '..', '..');
 
-function compileInline(template: string) {
+function compileInline(template: string, classBody = '') {
   const tsSource = [
     `import { Component } from '@angular/core';`,
     `@Component({ selector: 'app-t', template: \`${template.replace(/`/g, '')}\` })`,
-    `export class TComponent {}`,
+    `export class TComponent { ${classBody} }`,
   ].join('\n');
   return compileComponent({ tsSource, resolveFile: () => undefined });
 }
@@ -54,7 +54,7 @@ test('appbar draws no menu and no avatar unless the app asks for them', () => {
 });
 
 test('appbar titleAlign="center" centers the title in three zones, default unchanged', () => {
-  const centered = compileInline('<screen><appbar title="Rangular Tutorial" titleAlign="center" menu (menu)="go()"></appbar></screen>');
+  const centered = compileInline('<screen><appbar title="Rangular Tutorial" titleAlign="center" menu (menu)="go()"></appbar></screen>', 'go() {}');
   assert.equal(hasErrors(centered.diagnostics), false, JSON.stringify(centered.diagnostics));
   assert.match(centered.code, /titleAlign="center"/);
   assert.match(centered.code, /onMenu=/);
@@ -81,7 +81,7 @@ test('appbar titleAlign="center" centers the title in three zones, default uncha
 });
 
 test('icon-button compiles to RgIconButton and paints a real button in preview', () => {
-  const result = compileInline('<screen><icon-button name="chevron-left" (click)="go()"></icon-button></screen>');
+  const result = compileInline('<screen><icon-button name="chevron-left" (click)="go()"></icon-button></screen>', 'go() {}');
   assert.equal(hasErrors(result.diagnostics), false, JSON.stringify(result.diagnostics));
   assert.match(result.code, /RgIconButton/);
   assert.match(result.code, /name="chevron-left"/);

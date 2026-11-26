@@ -8,6 +8,7 @@
  *   rg watch <component.ts> --out <file.tsx> [--routes <file>]
  *   rg init <dir> [--app]
  *   rg doctor <component.ts> [--json] [--routes <file>]
+ *   rg verify [<component.ts>] [--json] [--routes <file>] [--no-strict]
  *
  * --routes names the routes file (Stage 9); without it the compiler
  * auto-discovers a sibling app.routes.ts next to the component.
@@ -22,12 +23,14 @@
  * holds the styles (Stage 5).
  */
 import * as fs from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import * as path from 'node:path';
 import {
   buildCatalog,
   compileComponent,
   Diagnostic,
   doctorStyleTexts,
+  fixStyleText,
   formatDiagnostic,
   hasErrors,
   parseTemplate,
@@ -113,13 +116,15 @@ function printJson(payload: Record<string, unknown>): void {
 
 const USAGE = [
   'Usage:',
-  '  rg build [<component.ts>] [--out <file.tsx>] [--json] [--source-map] [--routes <file>]',
+  '  rg build [<component.ts>] [--out <file.tsx>] [--json] [--source-map] [--routes <file>] [--strict | --no-strict]',
   '  rg ast <template.html>',
   '  rg preview <component.ts> --out <file.html> [--json] [--routes <file>]',
   '  rg catalog [--out <dir>]',
   '  rg watch <component.ts> --out <file.tsx> [--routes <file>]',
   '  rg init <dir> [--app]',
-  '  rg doctor <component.ts> [--json] [--routes <file>]',
+  '  rg doctor <component.ts> [--json] [--routes <file>] [--strict | --no-strict]',
+  '  rg verify [<component.ts>] [--json] [--routes <file>] [--no-strict]',
+  '  rg fix [<component.ts>] [--json] [--routes <file>]',
 ].join('\n');
 
 /**
@@ -189,6 +194,7 @@ const STARTER_TS = `import { Component } from \'@angular/core\';
   selector: \'app-root\',
   templateUrl: \'./app.component.html\',
   styles: [\`,
+    /* doctor: allow-hex (the starter band colours are the deliberate brand palette) */
     .band-title { font-size: 20px; font-weight: 700; color: #ffffff; }
     .band-sub { font-size: 14px; color: #d3e3fd; }
     .row { flex-direction: row; align-items: center; gap: 12px; }
@@ -491,6 +497,39 @@ the generated app behaves.`;
   packages arrive through npm like every other dependency, so Metro
   needs no special layout.`;
 
+  write('rangular.json', '{\n  "strict": true\n}\n');
+  write('AGENTS.md', `# Building this app with an AI assistant
+
+This is a Rangular app: Angular-style components in src/, compiled to
+React Native by the Rangular compiler, run by Expo.
+
+Rules the compiler enforces:
+
+- One structural directive per element: *ngIf or *ngFor, never both.
+- Methods hold only expression statements, returns, ifs and const
+  declarations. No loops; use map, forEach, filter and reduce.
+  No new Date() in methods; use Date.now() and civil date math.
+- Styles use the supported subset and the design scales: spacing
+  4 8 12 16 20 24 32, radius 8 12 16 20 full, font sizes
+  12 14 16 20 24 32. Off-scale values snap with a warning.
+- Every element and every prop must exist in the framework catalog.
+  When unsure, check the catalog before writing the code.
+- A template event binding must name a method the component has.
+- Nothing fails silently. An unsupported construct produces a coded
+  diagnostic with a fix. Read the fix and apply it; do not work
+  around a diagnostic.
+
+The verify loop:
+
+1. Run: rg verify
+   One gate: strict build, doctor, the app tests and a render
+   check. Strict mode is on in this app (rangular.json), so
+   warnings fail. Nothing is dropped or snapped quietly.
+2. Fix every diagnostic it names. Read the fix and apply it.
+3. Run rg verify again. Only a clean run means the work is done.
+
+The full guide lives in the framework repo at docs/AI_GUIDE.md.
+`);
   write('README.md', `# ${appName}
 
 A real Expo app scaffolded by the Rangular framework (Stage 12). You write
@@ -581,6 +620,7 @@ function initProject(dirArg: string): void {
   selector: 'app-root',
   templateUrl: './app.component.html',
   styles: [\`,
+    /* doctor: allow-hex (the starter band colours are the deliberate brand palette) */
     .band-title { font-size: 20px; font-weight: 700; color: #ffffff; }
     .band-sub { font-size: 14px; color: #d3e3fd; }
     .row { flex-direction: row; align-items: center; gap: 12px; }
@@ -769,7 +809,7 @@ function main(): void {
   // defaults --out to AppRoot.tsx beside the entry. Every app
   // follows that one shape, so the common case needs no
   // arguments at all. An explicit entry and --out still win.
-  if (command === 'build') {
+  if (command === 'build' || command === 'verify' || command === 'fix') {
     if (target && target.startsWith('--')) {
       rest = args.slice(1);
       target = '';
@@ -787,6 +827,18 @@ function main(): void {
     process.exit(command ? 2 : 0);
   }
   const json = rest.includes('--json');
+  // Strict mode (verification fortification, 2026-11-26): warnings fail
+  // the run. On when --strict is passed, or when the app folder's
+  // rangular.json sets "strict": true (the scaffold writes it on);
+  // --no-strict turns a config's strict off for one run.
+  const strict = ((): boolean => {
+    if (rest.includes('--no-strict')) return false;
+    if (rest.includes('--strict')) return true;
+    try {
+      const cfg = JSON.parse(fs.readFileSync(path.resolve('rangular.json'), 'utf8'));
+      return cfg?.strict === true;
+    } catch { return false; }
+  })();
 
   if (command === 'ast') {
     const abs = path.resolve(target);
@@ -816,22 +868,185 @@ function main(): void {
     ));
     const findings = runDoctor({ result, entryFile: absPath, styleTexts });
     const all = [...result.diagnostics, ...findings];
+    const dok = !hasErrors(all) && !(strict && all.some((d) => d.severity === 'warning'));
     if (json) {
       printJson({
-        ok: !hasErrors(all),
+        ok: dok,
         file: path.basename(target),
         diagnostics: all.map(toJsonDiagnostic),
       });
-      process.exit(hasErrors(all) ? 1 : 0);
+      process.exit(dok ? 0 : 1);
     }
     for (const d of all) console.error(formatDiagnostic(d, absPath));
     if (hasErrors(result.diagnostics)) process.exit(1);
+    if (!dok) {
+      console.error('strict mode: warnings and doctor findings treated as errors (pass --no-strict for one run without strict)');
+      process.exit(1);
+    }
     if (!findings.length) {
       console.log(`doctor: clean, ${target} has no polish findings`);
     } else {
       console.log(`doctor: ${findings.length} finding${findings.length === 1 ? '' : 's'} in ${target} (warnings do not fail the run)`);
     }
     process.exit(hasErrors(findings) ? 1 : 0);
+  }
+
+  if (command === 'verify') {
+    // One gate for a whole app (verification fortification, 2026-11-26):
+    // strict build, doctor, the app's own tests when it has a test
+    // script, and a render of the root preview. Strict is the default
+    // here (warnings fail); --no-strict reports warnings without
+    // failing. The exit code is the verdict, and --json carries the
+    // whole result as data, so an AI loop or a CI pipeline consumes
+    // the gate without parsing prose.
+    const vStrict = !rest.includes('--no-strict');
+    const { tsSource, resolveFile, resolveImport, absPath, rootDir } = readComponent(target);
+    const result = compileComponent({
+      tsSource, fileName: absPath, resolveFile, resolveImport, rootDir,
+      routesSpecifier: routesSpecifierFor(absPath, option(rest, '--routes')),
+    });
+    const errors = result.diagnostics.filter((d) => d.severity === 'error').length;
+    const warnings = result.diagnostics.length - errors;
+    const buildOk = errors === 0 && !(vStrict && warnings > 0);
+    const styleTexts = doctorStyleTexts(result, absPath, (abs) => (
+      withinRoot(rootDir, abs) && fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : undefined
+    ));
+    const findings = runDoctor({ result, entryFile: absPath, styleTexts });
+    const doctorOk = !vStrict || findings.length === 0;
+    let pkgDir: string | undefined;
+    for (let dir = path.dirname(absPath), i = 0; i < 4; i++, dir = path.dirname(dir)) {
+      if (fs.existsSync(path.join(dir, 'package.json'))) { pkgDir = dir; break; }
+    }
+    let testsRan = false;
+    let testsOk = true;
+    if (pkgDir) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+        if (pkg?.scripts?.test) {
+          testsRan = true;
+          const run = spawnSync('npm', ['test', '--silent'], { cwd: pkgDir, encoding: 'utf8', timeout: 300000 });
+          testsOk = run.status === 0;
+        }
+      } catch { testsRan = false; }
+    }
+    let renderOk = false;
+    let renderSkipped = false;
+    let renderDetail = '';
+    if (result.component && result.ast && errors === 0) {
+      try {
+        const html = renderPreview(result.component, result.ast, {
+          children: result.children,
+          services: result.services,
+          routes: result.routes,
+          pipes: result.pipes,
+          directives: result.directives,
+        });
+        renderOk = html.length > 200;
+        renderDetail = `preview rendered, ${html.length} bytes`;
+      } catch (e) {
+        renderDetail = e instanceof Error ? e.message : String(e);
+      }
+    } else {
+      renderSkipped = true;
+      renderDetail = 'skipped: the build has errors';
+    }
+    const ok = buildOk && doctorOk && testsOk && (renderOk || renderSkipped) && errors === 0;
+    const all = [...result.diagnostics, ...findings];
+    if (json) {
+      printJson({
+        ok,
+        file: path.basename(target),
+        strict: vStrict,
+        stages: {
+          build: { ok: buildOk, errors, warnings },
+          doctor: { ok: doctorOk, findings: findings.length },
+          tests: { ran: testsRan, ok: testsOk },
+          render: { ok: renderOk, skipped: renderSkipped, detail: renderDetail },
+        },
+        diagnostics: all.map(toJsonDiagnostic),
+      });
+      process.exit(ok ? 0 : 1);
+    }
+    for (const d of all) console.error(formatDiagnostic(d, absPath));
+    const line = (stage: string, state: string, detail: string): string => `verify: ${stage.padEnd(7)} ${state.padEnd(4)} ${detail}`;
+    console.log(line('build', buildOk ? 'PASS' : 'FAIL', `${errors} errors, ${warnings} warnings${vStrict ? ' (strict)' : ''}`));
+    console.log(line('doctor', doctorOk ? 'PASS' : 'FAIL', `${findings.length} finding${findings.length === 1 ? '' : 's'}`));
+    console.log(line('tests', testsRan ? (testsOk ? 'PASS' : 'FAIL') : 'SKIP', testsRan ? 'the app test script' : 'no test script in package.json'));
+    console.log(line('render', renderSkipped ? 'SKIP' : renderOk ? 'PASS' : 'FAIL', renderDetail));
+    console.log(ok ? `verify: OK, ${target} is clean` : `verify: FAIL, ${target} is not clean`);
+    process.exit(ok ? 0 : 1);
+  }
+
+  if (command === 'fix') {
+    // Apply the mechanical fixes (verification fortification,
+    // 2026-11-26): the repairs whose outcome the compiler already
+    // knows. Off-scale style values are written back snapped,
+    // unsupported style properties are removed with a comment, and a
+    // prop with exactly one near match in the catalog is renamed.
+    // Everything else is reported, never touched. The command ends
+    // with a fresh compile, and its exit code is that compile's
+    // verdict, like build.
+    const { tsSource, resolveFile, resolveImport, absPath, rootDir } = readComponent(target);
+    const routesSpecifier = routesSpecifierFor(absPath, option(rest, '--routes'));
+    const compileNow = (): ReturnType<typeof compileComponent> => compileComponent({
+      tsSource: fs.readFileSync(absPath, 'utf8'), fileName: absPath, resolveFile, resolveImport, rootDir, routesSpecifier,
+    });
+    const applied: string[] = [];
+    const first = compileNow();
+    const styleTexts = doctorStyleTexts(first, absPath, (abs) => (
+      withinRoot(rootDir, abs) && fs.existsSync(abs) ? fs.readFileSync(abs, 'utf8') : undefined
+    ));
+    for (const st of styleTexts) {
+      const fixed = fixStyleText(st.text);
+      if (!fixed.fixes.length) continue;
+      if (st.file.endsWith('.css')) {
+        fs.writeFileSync(st.file, fixed.text);
+        for (const f of fixed.fixes) applied.push(`${f.code}: ${f.detail} [in ${path.basename(st.file)}]`);
+      } else {
+        const content = fs.readFileSync(st.file, 'utf8');
+        if (content.split(st.text).length === 2) {
+          fs.writeFileSync(st.file, content.replace(st.text, fixed.text));
+          for (const f of fixed.fixes) applied.push(`${f.code}: ${f.detail} [in ${path.basename(st.file)}]`);
+        }
+      }
+    }
+    // The diagnostic's line counts lines of the template, while its
+    // file names the class file, so the rename finds its line by
+    // content: the first line holding both the tag and the attribute.
+    const templateFile = first.component?.templateUrl
+      ? path.resolve(path.dirname(absPath), first.component.templateUrl)
+      : absPath;
+    for (const d of first.diagnostics) {
+      if (d.code !== 'GEN_UNKNOWN_PROP') continue;
+      const near = /Did you mean '([^']+)'/.exec(d.fix ?? '');
+      const bad = /^'([^']+)' is not a prop of <([a-z-]+)>/.exec(d.message);
+      if (!near || !bad || !fs.existsSync(templateFile)) continue;
+      const lines = fs.readFileSync(templateFile, 'utf8').split('\n');
+      const patterns = [`[${bad[1]}]`, `[(${bad[1]})]`, `${bad[1]}=`, `${bad[1]} `, `${bad[1]}>`];
+      const idx = lines.findIndex((l) => l.includes(`<${bad[2]}`) && patterns.some((p) => l.includes(p)));
+      if (idx === -1) continue;
+      const hit = patterns.find((p) => lines[idx].includes(p));
+      if (!hit) continue;
+      lines[idx] = lines[idx].replace(hit, hit.replace(bad[1], near[1]));
+      fs.writeFileSync(templateFile, lines.join('\n'));
+      applied.push(`GEN_UNKNOWN_PROP: '${bad[1]}' -> '${near[1]}' [in ${path.basename(templateFile)}:${idx + 1}]`);
+    }
+    const after = compileNow();
+    if (json) {
+      printJson({
+        ok: !hasErrors(after.diagnostics),
+        file: path.basename(target),
+        applied,
+        diagnostics: after.diagnostics.map(toJsonDiagnostic),
+      });
+      process.exit(hasErrors(after.diagnostics) ? 1 : 0);
+    }
+    for (const a of applied) console.log(`fixed: ${a}`);
+    if (!applied.length) console.log('fix: nothing mechanical to apply');
+    for (const d of after.diagnostics) console.error(formatDiagnostic(d, absPath));
+    if (hasErrors(after.diagnostics)) process.exit(1);
+    console.log(`fix: done, ${applied.length} applied, the compile is clean`);
+    return;
   }
 
   if (command === 'build' || command === 'preview') {
@@ -845,7 +1060,8 @@ function main(): void {
     if (command === 'build') {
       const sourceMap = rest.includes('--source-map');
       const result = compileComponent({ tsSource, fileName: absPath, resolveFile, resolveImport, sourceMap, rootDir, routesSpecifier });
-      const ok = !hasErrors(result.diagnostics);
+      const warnCount = result.diagnostics.filter((d) => d.severity === 'warning').length;
+      const ok = !hasErrors(result.diagnostics) && !(strict && warnCount > 0);
       const writeOut = (): void => {
         fs.mkdirSync(path.dirname(path.resolve(out)), { recursive: true });
         if (sourceMap && result.sourceMap) {
@@ -869,7 +1085,10 @@ function main(): void {
         process.exit(ok ? 0 : 1);
       }
       for (const d of result.diagnostics) console.error(formatDiagnostic(d, absPath));
-      if (hasErrors(result.diagnostics)) process.exit(1);
+      if (!ok) {
+        if (strict && warnCount > 0 && !hasErrors(result.diagnostics)) console.error(`strict mode: ${warnCount} warning${warnCount === 1 ? '' : 's'} treated as errors (pass --no-strict for one run without strict)`);
+        process.exit(1);
+      }
       writeOut();
       console.log(`Wrote ${out} (${result.code.split('\n').length} lines)`);
       return;

@@ -139,6 +139,94 @@ export function analyzeMutatedFields(component: MethodHost): Set<string> {
   return mutated;
 }
 
+/**
+ * The stale-read trap (verification fortification, 2026-11-26): within
+ * one method, a field that is assigned, then read, then assigned again
+ * is read as the value from before the method ran, because generated
+ * state reads see the render snapshot, not the pending assignment.
+ * Flagged once per field per method as GEN_FIELD_REREAD. The scan
+ * walks statements in order (if branches in sequence) and never into
+ * arrow bodies, whose execution is deferred.
+ */
+export function analyzeFieldRereads(component: MethodHost): Diagnostic[] {
+  const fieldNames = new Set(component.fields.map((f) => f.name));
+  const diagnostics: Diagnostic[] = [];
+  for (const method of component.methodDetails) {
+    const statements = bodyStatements(method);
+    if (!statements) continue;
+    type FieldState = { assigned: boolean; readSince: boolean; flagged: boolean };
+    let state = new Map<string, FieldState>();
+    const snapshot = (m: Map<string, FieldState>): Map<string, FieldState> => new Map([...m].map(([k, v]) => [k, { ...v }]));
+    const onRead = (name: string): void => {
+      const s = state.get(name);
+      if (s?.assigned) s.readSince = true;
+    };
+    const onWrite = (name: string): void => {
+      const s = state.get(name) ?? { assigned: false, readSince: false, flagged: false };
+      if (s.assigned && s.readSince && !s.flagged) {
+        s.flagged = true;
+        diagnostics.push(warning(
+          'GEN_FIELD_REREAD',
+          `Method '${method.name}' assigns this.${name}, reads it, then assigns it again; the read sees the value from before the method ran, not the assigned value`,
+          undefined, undefined,
+          `Carry the new value in a local const inside ${method.name} and assign this.${name} once, at the end`,
+        ));
+      }
+      s.assigned = true;
+      s.readSince = false;
+      state.set(name, s);
+    };
+    const walk = (node: ts.Node): void => {
+      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return;
+      if (ts.isIfStatement(node)) {
+        // Branches are alternatives, not a sequence: walk each from the
+        // same entry state, then merge. A field counts as assigned when
+        // either branch assigns it, and a stale read counts when either
+        // branch leaves one pending, so the if/else toggle shape (one
+        // assignment per branch) stays silent while a read between two
+        // writes on any single path still flags.
+        walk(node.expression);
+        const entry = snapshot(state);
+        walk(node.thenStatement);
+        const afterThen = snapshot(state);
+        state = entry;
+        if (node.elseStatement) walk(node.elseStatement);
+        const afterElse = snapshot(state);
+        const merged = new Map<string, FieldState>();
+        for (const name of new Set([...afterThen.keys(), ...afterElse.keys()])) {
+          const a = afterThen.get(name);
+          const b = afterElse.get(name);
+          merged.set(name, {
+            assigned: (a?.assigned ?? false) || (b?.assigned ?? false),
+            readSince: (a?.readSince ?? false) || (b?.readSince ?? false),
+            flagged: (a?.flagged ?? false) || (b?.flagged ?? false),
+          });
+        }
+        state = merged;
+        return;
+      }
+      if (ts.isBinaryExpression(node) && ASSIGN_OPS.has(node.operatorToken.kind)) {
+        const target = isThisProperty(node.left);
+        if (target && fieldNames.has(target.name)) {
+          walk(node.right);
+          onWrite(target.name);
+          return;
+        }
+      }
+      if ((ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node)) &&
+        (node.operator === ts.SyntaxKind.PlusPlusToken || node.operator === ts.SyntaxKind.MinusMinusToken)) {
+        const target = isThisProperty(node.operand);
+        if (target && fieldNames.has(target.name)) { onRead(target.name); onWrite(target.name); return; }
+      }
+      const prop = isThisProperty(node);
+      if (prop && fieldNames.has(prop.name)) onRead(prop.name);
+      ts.forEachChild(node, walk);
+    };
+    for (const s of statements) walk(s);
+  }
+  return diagnostics;
+}
+
 interface Ctx {
   mode: TranslateMode;
   fieldNames: Set<string>;
@@ -654,7 +742,10 @@ export function translateMethods(
   stateFields: Set<string>,
   options: TranslateOptions = {},
 ): { methods: TranslatedMethod[]; diagnostics: Diagnostic[] } {
-  const diagnostics: Diagnostic[] = [];
+  // The stale-read check runs for components only: a service's fields
+  // are plain instance fields, so an assignment there is visible to
+  // the next read immediately and the trap does not exist.
+  const diagnostics: Diagnostic[] = mode === 'react' ? [...analyzeFieldRereads(component)] : [];
   const methods: TranslatedMethod[] = [];
   const fieldNames = new Set(component.fields.map((f) => f.name));
   const methodNames = new Set(component.methods);
