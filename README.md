@@ -12,6 +12,7 @@ step.**
 
 **What you can count on**
 
+- Vibe coding is now more deterministic and error free than it used to be. 
 - Nothing fails silently: 80 coded diagnostics, each with a written fix.
 - A handler that names a missing method is a compile error.
 - A prop that does not exist is a compile error, with the near match named.
