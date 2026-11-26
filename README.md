@@ -10,6 +10,17 @@ The vibe coding first framework for mobile apps. **Built for
 AI-driven software factories with rigorous verification at every
 step.**
 
+**What you can count on**
+
+- Nothing fails silently: 80 coded diagnostics, each with a written fix.
+- A handler that names a missing method is a compile error.
+- A prop that does not exist is a compile error, with the near match named.
+- A state read that would see a stale value is named before it ships.
+- Strict mode is on by default in a scaffolded app: warnings fail the build.
+- One gate: `rg verify` runs the strict build, the polish linter, your tests and a render check.
+- `rg fix` repairs the mechanical mistakes itself.
+- The proof is measured, not asserted: [docs/BENCHMARK.md](docs/BENCHMARK.md) builds the same app, with the same four mistakes seeded, in Rangular and in raw React Native. The gate named all four. TypeScript named two.
+
 The Rangular framework is a standalone transpiler: you write Angular-style code, TypeScript
 classes with `@Component`, HTML-like templates, dependency injection, and
 Rangular compiles it to React Native `.tsx`. The transpiler's target is React
