@@ -377,3 +377,18 @@ test('calendar: the shown month follows an outside value change; the title opens
   assert.ok(calSrc.includes('pickerYears(draft.year, today.year)'), 'the jump year wheel reuses the picker years');
   assert.ok(calSrc.includes('calendarCheck'), 'the jump carries its check disc');
 });
+
+test('a screen inside a screen renders embedded, with no scroller of its own', () => {
+  const screenFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('export function RgScreen'),
+    primitivesSrc.indexOf('function RgScreenBody'));
+  assert.ok(screenFn.includes('useContext(RgScrollContext)'), 'the screen checks whether it sits inside another screen');
+  assert.ok(screenFn.includes('RgScreenEmbedded'), 'a nested screen takes the embedded path');
+  const embeddedFn = primitivesSrc.slice(
+    primitivesSrc.indexOf('function RgScreenEmbedded'),
+    primitivesSrc.indexOf('function RgScreenBody'));
+  assert.ok(!embeddedFn.includes('<ScrollView'), 'the embedded screen renders no ScrollView');
+  assert.ok(!embeddedFn.includes('<SafeAreaProvider'), 'the embedded screen adds no safe-area layer');
+  assert.ok(!embeddedFn.includes('<RgScrollContext.Provider'), 'the embedded screen leaves the outer scroll control in place');
+  assert.ok(embeddedFn.includes('RgThemeContext.Provider'), 'the embedded screen still provides its theme');
+});

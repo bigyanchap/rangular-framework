@@ -70,6 +70,7 @@ export const DIAGNOSTIC_CODES: Record<string, string> = {
   STYLE_OFF_SCALE: 'A spacing, radius or font-size value is off its design-token scale; the generated style uses the nearest on-scale value.',
   GEN_UNKNOWN_TAG: 'A template tag is not a known Rangular block; it was emitted as <View>.',
   TPL_HANDLER: 'A template event binding names a method the component does not have; the handler would fail when the event fires.',
+  TPL_NESTED_SCREEN: 'A screen sits inside another screen in the same template; it renders embedded, as a flat themed region with no scroller of its own, so its scroll, refresh and end-reached settings have no effect.',
   GEN_UNKNOWN_PROP: 'An attribute or binding on a known element is not one of that element\'s props; it would be passed through and ignored.',
   GEN_FIELD_REREAD: 'A method assigns a field, reads it, then assigns it again; the read sees the value from before the method ran, not the assigned value.',
   GEN_FIELD: 'A field has a non-literal initializer that cannot be emitted verbatim into the generated component (it references this, or the field is assigned in a method); it is declared as undefined there so the output still compiles. A never-assigned non-literal initializer without this (new Date(), Date.now(), an expression over literals) is emitted verbatim and does not warn.',

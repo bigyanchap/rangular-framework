@@ -291,3 +291,19 @@ test('rg fix: snapped values written back, dead CSS removed, near-match prop ren
   assert.equal(again.status, 0, again.stderr + again.stdout);
   assert.match(again.stdout, /nothing mechanical to apply/);
 });
+
+test('TPL_NESTED_SCREEN: a screen inside a screen in one template is named, as a warning', () => {
+  const result = compile('<screen><card><p>Outer</p></card><screen theme="dark"><p>Inner</p></screen></screen>');
+  const diag = result.diagnostics.find((d) => d.code === 'TPL_NESTED_SCREEN');
+  assert.ok(diag, JSON.stringify(result.diagnostics));
+  assert.equal(diag.severity, 'warning');
+  assert.match(diag.message, /renders embedded/);
+  assert.match(diag.fix ?? '', /themed region/);
+});
+
+test('TPL_NESTED_SCREEN: nesting through a section still counts, siblings and a single screen stay silent', () => {
+  const deep = compile('<screen><section><screen><p>Inner</p></screen></section></screen>');
+  assert.equal(deep.diagnostics.some((d) => d.code === 'TPL_NESTED_SCREEN'), true, JSON.stringify(deep.diagnostics));
+  const siblings = compile('<screen><p>One</p></screen>');
+  assert.equal(siblings.diagnostics.some((d) => d.code === 'TPL_NESTED_SCREEN'), false, JSON.stringify(siblings.diagnostics));
+});
