@@ -602,6 +602,13 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
   };
   currentRefs = computeRefs(ast.children, state, baseScope);
 
+  // Nested-screen tracking (2026-11-27): a screen rendered while
+  // already inside a screen is embedded, matching the runtime,
+  // where a screen inside a screen renders flat with no scroller
+  // of its own. Balanced per render: incremented before a
+  // screen's children render, decremented right after.
+  let screenDepth = 0;
+
   const renderNodes = (nodes: TemplateNode[], scope: Scope): string =>
     nodes.map((n) => renderNode(n, scope)).join('\n');
 
@@ -1244,11 +1251,19 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
     const innerScope = arrayNameAttr !== undefined && scope['__formGroup']
       ? { ...scope, __formArray: (scope['__formGroup'] as FormGroup).get(arrayNameAttr) }
       : scope;
+    const isScreenEl = el.tag === 'screen';
+    const nestedScreen = isScreenEl && screenDepth > 0;
+    if (isScreenEl) screenDepth++;
     const inner = renderNodes(el.children, innerScope);
+    if (isScreenEl) screenDepth--;
     const title = bound(el, 'title', scope) ?? '';
     const dirStyle = directiveStyleAttr(el, scope);
     switch (el.tag) {
       case 'screen': {
+        // A screen inside a screen renders embedded (2026-11-27):
+        // a flat themed region, no second phone frame, matching
+        // the runtime's embedded screen.
+        if (nestedScreen) return `<div class="screen-embedded">${inner}</div>`;
         // Stage 15: a bound refreshing flag paints the pull to
         // refresh spinner row, the native spinner's stand-in.
         const refreshing = truthy(rawBound(el, 'refreshing', scope));
@@ -1601,6 +1616,7 @@ export function renderPreview(component: ComponentInfo, ast: TemplateRoot, data:
      (spacing.md) as the gap between stacked blocks. Blocks carry no
      horizontal margins of their own, in either renderer. */
   .screen { position: relative; width: 360px; max-width: 100%; min-height: 640px; background: var(--screen-bg); color: var(--text); border-radius: 28px; overflow: hidden; box-shadow: 0 10px 28px rgba(0,0,0,.18); padding: ${t.spacing.md}px ${t.spacing.lg}px ${t.spacing.xxl}px; display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
+  .screen-embedded { background: var(--screen-bg); color: var(--text); border-radius: 20px; padding: ${t.spacing.md}px ${t.spacing.lg}px; display: flex; flex-direction: column; gap: ${t.spacing.md}px; }
   .appbar { display: flex; align-items: center; gap: ${t.spacing.md}px; background: var(--surface-variant); border-radius: ${t.radius.full}px; padding: 10px ${t.spacing.lg}px; }
   .search { flex: 1; color: var(--text-muted); font-size: 14px; }
   .appbar-title { flex: 1; font-size: ${t.typography.title.fontSize}px; font-weight: 600; }
@@ -2811,6 +2827,7 @@ function __badgeDot(el, scope) {
 // The spinner arc (Stage 11): the same path RgSpinner draws in
 // @rangular-framework/ui and the static paint draws; a test pins the copies.
 var __SPINNER_ARC = 'M 12 3 A 9 9 0 1 1 3 12';
+var __screenDepth = 0;
 // Date-time helpers (Stage 10). Plain-JS mirrors of @rangular-framework/ui
 // datetime.ts: the same parsing, composition, wheel and formatting
 // rules, parity-tested against the TypeScript helpers.
@@ -6176,7 +6193,11 @@ function __buildCore(el, scope, path, form) {
       kidsForm = extended;
     }
   }
+  var isScreenEl = el.tag === 'screen';
+  var nestedScreen = isScreenEl && __screenDepth > 0;
+  if (isScreenEl) __screenDepth++;
   var kids = __buildNodes(el.children, scope, path, kidsForm);
+  if (isScreenEl) __screenDepth--;
   function wrap(tag, cls) {
     var d = document.createElement(tag);
     if (cls) d.className = cls;
@@ -6186,6 +6207,10 @@ function __buildCore(el, scope, path, form) {
   var title = __attr(el, 'title', scope);
   switch (el.tag) {
     case 'screen': {
+      // A screen inside a screen renders embedded (2026-11-27):
+      // a flat themed region, no second phone frame and no
+      // scroll cues, matching the runtime's embedded screen.
+      if (nestedScreen) return [wrap('div', 'screen-embedded')[0]];
       var scr = wrap('div', 'screen')[0];
       // Stage 15: pull to refresh and infinite scroll. The cues
       // are documented preview affordances (a DOM preview cannot
