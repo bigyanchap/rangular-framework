@@ -142,6 +142,14 @@ method bodies is a defined subset: do not assume all of TypeScript:
 - Blocks compose freely, like HTML: a `<button>` inside a `<card>`, a
   `<row>` inside a `<card>`, headings and paragraphs anywhere a screen or
   card can hold children. There is no separate permission table per parent.
+- A `<screen>` inside another `<screen>` is safe and supported: it
+  renders embedded, as a flat themed region with no scroller of its
+  own, so two same-direction scrollers never fight on a page (on
+  Android that fight reads as a steady flicker). Use a nested screen
+  when a region needs its own `theme`, for example a dark panel
+  inside a light page. Its children keep the outer screen's scroll,
+  refresh and end-reached contracts. The preview mirrors this: a
+  nested screen paints as a flat region, not a second phone frame.
   Controls compose the same way: a control may nest inside a `<row>`,
   so a habit list row can carry its own `<checkbox>` (the row renders
   its title lines and the control together).
