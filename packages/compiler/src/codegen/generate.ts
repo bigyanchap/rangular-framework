@@ -1350,9 +1350,23 @@ class Generator {
       directiveNames.add(attr);
       for (const inp of entry3.info.inputs) directiveNames.add(inp.name);
     }
-    const validateBindings = (nodes: TemplateNode[]): void => {
+    const validateBindings = (nodes: TemplateNode[], screenDepth = 0): void => {
       for (const node of nodes) {
         if (node.type !== 'element') continue;
+        // A screen inside a screen (nested-screen round,
+        // 2026-11-27): the runtime renders it embedded, a flat
+        // themed region with no scroller, which is a supported
+        // shape for themed regions but a silent surprise when the
+        // author meant a page. Name it, as a warning: the shape
+        // is legal, the lost scroll settings are the cost.
+        if (node.tag.toLowerCase() === 'screen' && screenDepth > 0) {
+          diagnostics.push(warning(
+            'TPL_NESTED_SCREEN',
+            `This <screen> sits inside another <screen>; it renders embedded, as a flat themed region with no scroller of its own, and its scroll, refresh and end-reached settings have no effect`,
+            node.pos.line, node.pos.column,
+            `Keep it if a themed region is what you want; a nested screen keeps its theme. If it was meant to be its own page, move it to the root of a component template`,
+          ));
+        }
         for (const ev of node.eventBindings) {
           const expr = ev.expression.trim();
           const m = /^([A-Za-z_$][\w$]*)\s*\(/.exec(expr) ?? /^([A-Za-z_$][\w$]*)$/.exec(expr);
@@ -1385,7 +1399,7 @@ class Generator {
             ));
           }
         }
-        validateBindings(node.children);
+        validateBindings(node.children, node.tag.toLowerCase() === 'screen' ? screenDepth + 1 : screenDepth);
       }
     };
     validateBindings(ast.children);
