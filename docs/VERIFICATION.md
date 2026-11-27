@@ -14,7 +14,7 @@ done when the gate is clean.
 
 ## The layers
 
-1. **Compile-time diagnostics.** 80 codes, registered in
+1. **Compile-time diagnostics.** 81 codes, registered in
    `DIAGNOSTIC_CODES` in the compiler and listed in the catalog.
    They cover template structure, unknown elements and icons,
    unknown props on known elements (`GEN_UNKNOWN_PROP`), event
@@ -49,6 +49,21 @@ done when the gate is clean.
    naming what was taken out, and a prop renamed when the catalog
    holds exactly one near match. Everything else is reported, never
    touched.
+
+6. **Runtime prevention.** Some failures cannot be caught by a
+   diagnostic alone, because the code is legal and the shape only
+   breaks on a device. The framework prevents those shapes at
+   runtime. A screen inside another screen is the proven case: on
+   Android, two vertical scrollers on one page fought each other,
+   and the tutorial's Lesson 25 flickered at a steady cadence when
+   scrolled down, starting once the Best Practice text passed under
+   the title. The framework now renders the inner screen as a flat
+   themed region with no scroller of its own, so the shape cannot
+   occur in any app built with it. The browser preview renders the
+   same embedded region, so what the author sees is what the phone
+   runs. Prevention, not detection after the fact, is the point:
+   anything known to cause trouble at runtime, or in rapid coding,
+   is stopped before it reaches a device.
 
 ## In a pipeline
 

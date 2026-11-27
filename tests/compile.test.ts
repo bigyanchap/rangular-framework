@@ -47,3 +47,14 @@ test('unresolvable templateUrl is an error diagnostic, not a throw', () => {
   assert.equal(hasErrors(result.diagnostics), true);
   assert.ok(result.diagnostics.some((d) => d.code === 'CMP_TEMPLATE'));
 });
+
+test('a nested screen previews as an embedded region, not a second frame', () => {
+  const result = compileComponent({
+    tsSource: `@Component({ selector: 'app-nest', template: '<screen><card><p>Outer</p></card><screen theme="dark"><card><p>Inner</p></card></screen></screen>' }) export class NestComponent {}`,
+  });
+  assert.equal(hasErrors(result.diagnostics), false, JSON.stringify(result.diagnostics));
+  const html = renderPreview(result.component!, result.ast!);
+  assert.match(html, /class="screen-embedded"/);
+  assert.equal((html.match(/class="screen"/g) ?? []).length, 1, 'only the outer screen is a frame');
+  assert.ok(html.includes('__screenDepth'), 'the interactive preview tracks screen depth too');
+});

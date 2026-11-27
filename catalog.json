@@ -2825,6 +2825,10 @@
       "meaning": "A template event binding names a method the component does not have; the handler would fail when the event fires."
     },
     {
+      "code": "TPL_NESTED_SCREEN",
+      "meaning": "A screen sits inside another screen in the same template; it renders embedded, as a flat themed region with no scroller of its own, so its scroll, refresh and end-reached settings have no effect."
+    },
+    {
       "code": "GEN_UNKNOWN_PROP",
       "meaning": "An attribute or binding on a known element is not one of that element's props; it would be passed through and ignored."
     },

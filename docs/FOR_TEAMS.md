@@ -17,13 +17,20 @@ An AI-driven software factory has one recurring problem: generated
 code that almost works, failing silently in ways a human reviewer
 finds late. Rangular is built against that problem.
 
-- **Verification at every step.** 80 coded diagnostics with written
+- **Verification at every step.** 81 coded diagnostics with written
   fixes, strict mode on by default in scaffolded apps, a polish
   linter (`rg doctor`), one headless gate (`rg verify`) whose
   verdict is an exit code and whose findings arrive as JSON, and a
   mechanical fixer (`rg fix`) for the repairs that need no judgment.
   The full contract is in [VERIFICATION.md](VERIFICATION.md), and a
   measured comparison is in [BENCHMARK.md](BENCHMARK.md).
+- **Prevention before runtime.** Patterns known to fail at runtime are
+  prevented before they can reach a device. A screen placed inside
+  another screen, for example, is rendered as a flat themed region
+  with no scroller of its own, so two same-direction scrollers can
+  never fight on a page. The framework removes the failure mode
+  itself. It does not leave it for a reviewer, a test run, or a user
+  to find.
 - **A small, stable surface.** The whole language an author, human
   or AI, may use is the generated catalog: 76 tags, 70 primitives,
   the design tokens, the icon set. Diagnostic codes, once shipped,
